@@ -17,6 +17,7 @@ import {
 } from "lucide-react"
 
 import { OnuLocationDialog } from "@/components/onu-location-dialog"
+import { OnuViewLocationDialog } from "@/components/onu-view-location-dialog"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -95,7 +96,29 @@ export function AppShell({ children }: { children?: React.ReactNode }) {
   const authSnapshot = useSyncExternalStore(subscribeAuth, getAuthSnapshot, () => "")
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
-  const { state, openAlertCount, locationDialogOnu, setLocationDialogOnu, saveOnuLocation, clearOnuLocation } = useMonitoring()
+  const {
+    state,
+    openAlertCount,
+    locationDialogOnu,
+    setLocationDialogOnu,
+    viewLocationDialogOnu,
+    setViewLocationDialogOnu,
+    saveOnuLocation,
+    clearOnuLocation,
+  } = useMonitoring()
+
+  const oltNameMap = useMemo(() => new globalThis.Map(state.olts.map((o) => [o.id, o.name])), [state.olts])
+  const activeViewOnu = useMemo(
+    () =>
+      viewLocationDialogOnu
+        ? state.onus.find((o) => o.id === viewLocationDialogOnu.id) ?? viewLocationDialogOnu
+        : null,
+    [state.onus, viewLocationDialogOnu],
+  )
+  const otherMappedOnus = useMemo(
+    () => state.onus.filter((o) => o.id !== activeViewOnu?.id && o.latitude != null && o.longitude != null),
+    [state.onus, activeViewOnu?.id],
+  )
 
   const session = useMemo(() => {
     if (!authSnapshot) return null
@@ -376,6 +399,19 @@ export function AppShell({ children }: { children?: React.ReactNode }) {
         onOpenChange={(open) => !open && setLocationDialogOnu(null)}
         onSave={saveOnuLocation}
         onClear={clearOnuLocation}
+      />
+
+      <OnuViewLocationDialog
+        onu={activeViewOnu}
+        oltName={oltNameMap.get(activeViewOnu?.oltId ?? "") ?? "-"}
+        otherOnus={otherMappedOnus}
+        oltNameMap={oltNameMap}
+        open={Boolean(activeViewOnu)}
+        onOpenChange={(open) => !open && setViewLocationDialogOnu(null)}
+        onEditLocation={(target) => {
+          setViewLocationDialogOnu(null)
+          setLocationDialogOnu(target)
+        }}
       />
     </div>
   )

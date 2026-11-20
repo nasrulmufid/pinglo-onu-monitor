@@ -10,7 +10,8 @@ export function MapTileLayers({ layer }: { layer: MapLayerMode }) {
         attribution="&copy; Google Maps"
         url="https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
         subdomains={["mt0", "mt1", "mt2", "mt3"]}
-        maxZoom={20}
+        maxNativeZoom={20}
+        maxZoom={21}
       />
     )
   }
@@ -22,17 +23,20 @@ export function MapTileLayers({ layer }: { layer: MapLayerMode }) {
           key="esri-imagery"
           attribution="Tiles &copy; Esri"
           url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-          maxZoom={19}
+          maxNativeZoom={19}
+          maxZoom={21}
         />
         <TileLayer
           key="esri-roads"
           url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}"
-          maxZoom={19}
+          maxNativeZoom={19}
+          maxZoom={21}
         />
         <TileLayer
           key="esri-places"
           url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
-          maxZoom={19}
+          maxNativeZoom={19}
+          maxZoom={21}
         />
       </>
     )
@@ -43,7 +47,8 @@ export function MapTileLayers({ layer }: { layer: MapLayerMode }) {
       key="osm"
       attribution="&copy; OpenStreetMap contributors"
       url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      maxZoom={19}
+      maxNativeZoom={19}
+      maxZoom={21}
     />
   )
 }

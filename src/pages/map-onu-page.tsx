@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react"
 import { MapContainer, Marker, Popup, useMapEvents } from "react-leaflet"
-import { CheckCircle2, FileSpreadsheet, Globe, Layers, MapPin, Pencil, Save, Search, Wifi, WifiOff, X } from "lucide-react"
+import { CheckCircle2, FileSpreadsheet, Globe, Layers, LocateFixed, MapPin, Pencil, Save, Search, Wifi, WifiOff, X } from "lucide-react"
 
 import { BulkLocationImportDialog } from "@/components/bulk-location-import-dialog"
+import { MapOverlayControls, MapResizeSync, useMapFullscreen } from "@/components/map-fullscreen"
 import { MapTileLayers, type MapLayerMode } from "@/components/map-tile-layers"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
@@ -28,7 +29,7 @@ function QuickPickListener({ active, onPick }: { active: boolean; onPick: (lat: 
 }
 
 export function MapOnuPage() {
-  const { state, saveOnuLocation, setLocationDialogOnu } = useMonitoring()
+  const { state, saveOnuLocation, setLocationDialogOnu, setViewLocationDialogOnu } = useMonitoring()
   const { olts, onus } = state
   const mapSettings = state.settings.map
 
@@ -42,6 +43,9 @@ export function MapOnuPage() {
   const [draftCoord, setDraftCoord] = useState<{ lat: number; lng: number } | null>(null)
   const [saving, setSaving] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
+  const { containerRef, isCssFullscreen, isFullscreen, exitFullscreen, toggleFullscreen } = useMapFullscreen<HTMLDivElement>({
+    handleWindowEscape: true,
+  })
 
   const oltNameMap = useMemo(() => new Map(olts.map((o) => [o.id, o.name])), [olts])
 
@@ -238,9 +242,62 @@ export function MapOnuPage() {
       )}
 
       <div className="grid gap-4 xl:grid-cols-[1fr_330px]">
-        <Card className="isolate relative h-[52vh] min-h-[340px] max-h-[520px] overflow-hidden xl:h-[620px] xl:max-h-none">
-          <MapContainer center={[mapSettings.defaultLat, mapSettings.defaultLng]} zoom={mapSettings.defaultZoom} maxZoom={20} className="h-full w-full">
+        <Card
+          ref={containerRef}
+          className={cn(
+            "isolate relative overflow-hidden",
+            isCssFullscreen
+              ? "fixed inset-0 z-[450] !h-[100dvh] !max-h-none !w-screen rounded-none border-0 bg-background"
+              : "h-[52vh] min-h-[340px] max-h-[520px] xl:h-[620px] xl:max-h-none",
+          )}
+        >
+          <MapOverlayControls
+            isFullscreen={isFullscreen}
+            onToggleFullscreen={toggleFullscreen}
+            layer={layer}
+            onLayerChange={setLayer}
+          />
+
+          {isFullscreen && assigningOnu && (
+            <div
+              className="pointer-events-auto absolute bottom-3 left-3 right-3 z-20 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/80 bg-background/95 p-2.5 shadow-lg backdrop-blur-md sm:bottom-auto sm:left-14 sm:right-auto sm:top-2.5 sm:max-w-md"
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+              onDoubleClick={(e) => e.stopPropagation()}
+            >
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-semibold">Mode Set Lokasi: {assigningOnu.name}</p>
+                <p className="truncate text-[11px] text-muted-foreground">
+                  {draftCoord
+                    ? `${draftCoord.lat.toFixed(6)}, ${draftCoord.lng.toFixed(6)}`
+                    : "Klik titik lokasi perangkat ONU di peta."}
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Button size="sm" className="h-7 px-2.5 text-xs" disabled={!draftCoord || saving} onClick={() => void handleQuickSave()}>
+                  <Save className="h-3 w-3" />
+                  {saving ? "Simpan..." : "Simpan"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => {
+                    setAssigningOnu(null)
+                    setDraftCoord(null)
+                  }}
+                >
+                  Batal
+                </Button>
+              </div>
+            </div>
+          )}
+
+          <MapContainer center={[mapSettings.defaultLat, mapSettings.defaultLng]} zoom={mapSettings.defaultZoom} maxZoom={21} className="h-full w-full">
             <MapTileLayers layer={layer} />
+            <MapResizeSync trigger={`${isFullscreen}-${oltFilter}-${ponFilter}-${statusFilter}`} />
 
             <QuickPickListener active={Boolean(assigningOnu)} onPick={(lat, lng) => setDraftCoord({ lat, lng })} />
             {draftCoord && <Marker position={[draftCoord.lat, draftCoord.lng]} icon={draftOnuIcon} />}
@@ -275,10 +332,32 @@ export function MapOnuPage() {
                         {onu.locationNote && <p className="italic opacity-75">Catatan: {onu.locationNote}</p>}
                         <p className="text-[11px] opacity-60">Update: {onu.lastSeen}</p>
                       </div>
-                      <Button size="sm" variant="outline" className="h-7 w-full text-xs" onClick={() => setLocationDialogOnu(onu)}>
-                        <Pencil className="h-3 w-3" />
-                        Edit Lokasi
-                      </Button>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="h-7 w-full text-xs"
+                          onClick={async () => {
+                            await exitFullscreen()
+                            setViewLocationDialogOnu(onu)
+                          }}
+                        >
+                          <LocateFixed className="h-3 w-3 text-primary" />
+                          View Location
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 w-full text-xs"
+                          onClick={async () => {
+                            await exitFullscreen()
+                            setLocationDialogOnu(onu)
+                          }}
+                        >
+                          <Pencil className="h-3 w-3" />
+                          Edit Lokasi
+                        </Button>
+                      </div>
                     </div>
                   </Popup>
                 </Marker>

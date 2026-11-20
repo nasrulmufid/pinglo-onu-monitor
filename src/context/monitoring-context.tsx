@@ -11,6 +11,8 @@ type MonitoringContextValue = {
   pollingOltId: string | null
   locationDialogOnu: Onu | null
   setLocationDialogOnu: (onu: Onu | null) => void
+  viewLocationDialogOnu: Onu | null
+  setViewLocationDialogOnu: (onu: Onu | null) => void
   operationalAlerts: Alert[]
   openAlertCount: number
   onlineOltCount: number
@@ -41,6 +43,7 @@ export function MonitoringProvider({ children }: { children: React.ReactNode }) 
   const [notice, setNotice] = useState("Memuat database SQLite...")
   const [pollingOltId, setPollingOltId] = useState<string | null>(null)
   const [locationDialogOnu, setLocationDialogOnu] = useState<Onu | null>(null)
+  const [viewLocationDialogOnu, setViewLocationDialogOnu] = useState<Onu | null>(null)
 
   const stateRef = useRef(state)
   const pollingLocksRef = useRef(new Set<string>())
@@ -379,6 +382,8 @@ export function MonitoringProvider({ children }: { children: React.ReactNode }) 
       pollingOltId,
       locationDialogOnu,
       setLocationDialogOnu,
+      viewLocationDialogOnu,
+      setViewLocationDialogOnu,
       ...derived,
       saveOnuLocation,
       bulkSaveOnuLocations,
@@ -399,6 +404,7 @@ export function MonitoringProvider({ children }: { children: React.ReactNode }) 
       notice,
       pollingOltId,
       locationDialogOnu,
+      viewLocationDialogOnu,
       derived,
       saveOnuLocation,
       bulkSaveOnuLocations,

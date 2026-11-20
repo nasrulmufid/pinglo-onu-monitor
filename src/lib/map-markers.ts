@@ -50,3 +50,33 @@ export const draftOnuIcon = createWifiMarkerIcon({
   borderWidth: 3,
   shadow: "0 0 0 6px rgba(8,145,178,0.35), 0 3px 10px rgba(0,0,0,0.45)",
 })
+
+function createTargetPinMarkerIcon(options: { isOnline: boolean }) {
+  const gradId = options.isOnline ? "pinglo-target-grad-online" : "pinglo-target-grad-offline"
+  const svg = options.isOnline ? wifiOnlineSvg : wifiOfflineSvg
+  const statusColor = options.isOnline ? "#10b981" : "#ef4444"
+
+  return L.divIcon({
+    className: "",
+    html: `<div style="position:relative;width:44px;height:54px;">
+      <span class="pinglo-target-pulse" style="position:absolute;left:22px;top:50px;width:24px;height:24px;border-radius:9999px;border:2.5px solid #f59e0b;background:rgba(245,158,11,0.28);box-shadow:0 0 0 2px rgba(245,158,11,0.55);pointer-events:none;"></span>
+      <svg xmlns="http://www.w3.org/2000/svg" width="44" height="54" viewBox="0 0 44 54" style="display:block;filter:drop-shadow(0 4px 8px rgba(0,0,0,0.45));">
+        <defs>
+          <linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#f59e0b"/>
+            <stop offset="100%" stop-color="#d97706"/>
+          </linearGradient>
+        </defs>
+        <path d="M22 3C11.507 3 3 11.507 3 22c0 12.1 14.2 24.4 17.75 27.3a2 2 0 0 0 2.5 0C26.8 46.4 41 34.1 41 22 41 11.507 32.493 3 22 3Z" fill="url(#${gradId})" stroke="#ffffff" stroke-width="2.5"/>
+      </svg>
+      <div style="position:absolute;left:12px;top:11px;width:20px;height:20px;display:flex;align-items:center;justify-content:center;pointer-events:none;">${svg}</div>
+      <span style="position:absolute;right:3px;top:3px;width:12px;height:12px;border-radius:9999px;background:${statusColor};border:2px solid #ffffff;box-shadow:0 1px 4px rgba(0,0,0,0.35);pointer-events:none;"></span>
+    </div>`,
+    iconSize: [44, 54],
+    iconAnchor: [22, 50],
+    popupAnchor: [0, -52],
+  })
+}
+
+export const targetOnlineOnuIcon = createTargetPinMarkerIcon({ isOnline: true })
+export const targetOfflineOnuIcon = createTargetPinMarkerIcon({ isOnline: false })

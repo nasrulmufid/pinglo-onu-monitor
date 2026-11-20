@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Eye,
   FileSpreadsheet,
+  LocateFixed,
   MapPin,
   Pencil,
   RefreshCcw,
@@ -38,7 +39,7 @@ import type { Onu } from "@shared/types"
 type OnuFilterTab = "all" | "online" | "down" | "weak-rx" | "unmapped"
 
 export function OnusView() {
-  const { state, pollingOltId, setLocationDialogOnu, pollOnu, saveRename } = useMonitoring()
+  const { state, pollingOltId, setLocationDialogOnu, setViewLocationDialogOnu, pollOnu, saveRename } = useMonitoring()
   const { olts, onus } = state
 
   const [selectedOltId, setSelectedOltId] = useState("all")
@@ -355,7 +356,11 @@ export function OnusView() {
 
                       <div>
                         <p className="text-[10px] text-muted-foreground">Peta</p>
-                        <button type="button" onClick={() => setLocationDialogOnu(onu)} className="mt-0.5 block">
+                        <button
+                          type="button"
+                          onClick={() => (hasCoord ? setViewLocationDialogOnu(onu) : setLocationDialogOnu(onu))}
+                          className="mt-0.5 block"
+                        >
                           <Badge variant={hasCoord ? "success" : "secondary"} className="h-5 px-1.5 text-[10px]">
                             {hasCoord ? "Terpetakan" : "Belum diset"}
                           </Badge>
@@ -363,26 +368,59 @@ export function OnusView() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-[1fr_auto_auto] gap-1.5">
-                      <Button size="sm" variant="outline" onClick={() => setLocationDialogOnu(onu)}>
-                        <MapPin className="h-3.5 w-3.5 text-primary" />
-                        {hasCoord ? "Edit Lokasi" : "Set Lokasi"}
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="outline"
-                        onClick={() => {
-                          setEditingOnuId(onu.id)
-                          setDraftName(onu.name)
-                        }}
-                        aria-label={`Rename ${onu.name}`}
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button size="icon" variant="secondary" onClick={() => setDetailOnu(onu)} aria-label={`Detail ${onu.name}`}>
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    {hasCoord ? (
+                      <div className="space-y-1.5">
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <Button size="sm" variant="secondary" onClick={() => setViewLocationDialogOnu(onu)}>
+                            <LocateFixed className="h-3.5 w-3.5 text-primary" />
+                            View Location
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => setLocationDialogOnu(onu)}>
+                            <MapPin className="h-3.5 w-3.5 text-primary" />
+                            Edit Lokasi
+                          </Button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setEditingOnuId(onu.id)
+                              setDraftName(onu.name)
+                            }}
+                            aria-label={`Rename ${onu.name}`}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            Rename
+                          </Button>
+                          <Button size="sm" variant="secondary" onClick={() => setDetailOnu(onu)} aria-label={`Detail ${onu.name}`}>
+                            <Eye className="h-3.5 w-3.5" />
+                            Detail
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-[1fr_auto_auto] gap-1.5">
+                        <Button size="sm" variant="outline" onClick={() => setLocationDialogOnu(onu)}>
+                          <MapPin className="h-3.5 w-3.5 text-primary" />
+                          Set Lokasi
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          onClick={() => {
+                            setEditingOnuId(onu.id)
+                            setDraftName(onu.name)
+                          }}
+                          aria-label={`Rename ${onu.name}`}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button size="icon" variant="secondary" onClick={() => setDetailOnu(onu)} aria-label={`Detail ${onu.name}`}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )
               })
@@ -534,7 +572,12 @@ export function OnusView() {
                         </TableCell>
 
                         <TableCell>
-                          <button type="button" onClick={() => setLocationDialogOnu(onu)} className="text-left">
+                          <button
+                            type="button"
+                            onClick={() => (hasCoord ? setViewLocationDialogOnu(onu) : setLocationDialogOnu(onu))}
+                            title={hasCoord ? "Lihat lokasi di peta" : "Set lokasi di peta"}
+                            className="text-left"
+                          >
                             {hasCoord ? (
                               <Badge variant="success" className="font-mono text-[11px] hover:opacity-85">
                                 {onu.latitude!.toFixed(5)}, {onu.longitude!.toFixed(5)}
@@ -549,6 +592,13 @@ export function OnusView() {
 
                         <TableCell className="text-right">
                           <div className="inline-flex items-center gap-1.5">
+                            {hasCoord && (
+                              <Button size="sm" variant="secondary" onClick={() => setViewLocationDialogOnu(onu)}>
+                                <LocateFixed className="h-3.5 w-3.5 text-primary" />
+                                View Location
+                              </Button>
+                            )}
+
                             <Button size="sm" variant="outline" onClick={() => setLocationDialogOnu(onu)}>
                               <MapPin className="h-3.5 w-3.5 text-primary" />
                               {hasCoord ? "Edit Lokasi" : "Set Lokasi"}
@@ -751,17 +801,43 @@ export function OnusView() {
               </ScrollArea>
 
               <SheetFooter className="mt-4 border-t pt-4">
-                <Button
-                  className="w-full"
-                  onClick={() => {
-                    const target = detailOnu
-                    setDetailOnu(null)
-                    setLocationDialogOnu(target)
-                  }}
-                >
-                  <MapPin className="h-4 w-4" />
-                  {detailOnu.latitude != null ? "Edit Lokasi Peta" : "Set Lokasi Peta"}
-                </Button>
+                {detailOnu.latitude != null && detailOnu.longitude != null ? (
+                  <div className="grid w-full grid-cols-2 gap-2">
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        const target = detailOnu
+                        setDetailOnu(null)
+                        setViewLocationDialogOnu(target)
+                      }}
+                    >
+                      <LocateFixed className="h-4 w-4 text-primary" />
+                      View Location
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        const target = detailOnu
+                        setDetailOnu(null)
+                        setLocationDialogOnu(target)
+                      }}
+                    >
+                      <MapPin className="h-4 w-4" />
+                      Edit Lokasi Peta
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    className="w-full"
+                    onClick={() => {
+                      const target = detailOnu
+                      setDetailOnu(null)
+                      setLocationDialogOnu(target)
+                    }}
+                  >
+                    <MapPin className="h-4 w-4" />
+                    Set Lokasi Peta
+                  </Button>
+                )}
               </SheetFooter>
             </>
           )}

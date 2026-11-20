@@ -3,6 +3,7 @@ import type L from "leaflet"
 import { MapContainer, Marker, useMap, useMapEvents } from "react-leaflet"
 import { Globe, Layers, MapPin, Save, Trash2 } from "lucide-react"
 
+import { MapOverlayControls, MapResizeSync, useMapFullscreen } from "@/components/map-fullscreen"
 import { MapTileLayers, type MapLayerMode } from "@/components/map-tile-layers"
 import {
   AlertDialog,
@@ -24,6 +25,7 @@ import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { draftOnuIcon, offlineOnuIcon, onlineOnuIcon } from "@/lib/map-markers"
+import { cn } from "@/lib/utils"
 import type { MapSettings, Onu } from "@shared/types"
 
 function MapClickHandler({ onPick }: { onPick: (lat: number, lng: number) => void }) {
@@ -65,6 +67,13 @@ export function OnuLocationDialog({
   const [note, setNote] = useState("")
   const [layer, setLayer] = useState<MapLayerMode>("satellite")
   const [saving, setSaving] = useState(false)
+  const { containerRef, isCssFullscreen, isFullscreen, exitFullscreen, toggleFullscreen } = useMapFullscreen<HTMLDivElement>({
+    handleWindowEscape: false,
+  })
+
+  useEffect(() => {
+    if (!open) void exitFullscreen()
+  }, [open, exitFullscreen])
 
   useEffect(() => {
     if (!onu) return
@@ -91,49 +100,78 @@ export function OnuLocationDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 pr-8">
-            <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary/10 text-primary">
-              <MapPin className="h-4 w-4" />
-            </span>
-            <span>Set Lokasi ONU: {onu?.name}</span>
-          </DialogTitle>
-          <DialogDescription className="flex flex-wrap items-center gap-1.5 pt-1">
-            <Badge variant="outline">{oltName}</Badge>
-            <Badge variant="secondary" className="font-mono">
-              PON {onu?.ponPort}:{onu?.onuIndex}
-            </Badge>
-            <Badge variant="secondary" className="font-mono">
-              SN: {onu?.serialNumber}
-            </Badge>
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent
+        className={cn(
+          "max-w-3xl",
+          isCssFullscreen &&
+            "!fixed !inset-0 !left-0 !top-0 !h-[100dvh] !max-h-[100dvh] !w-[100vw] !max-w-none !translate-x-0 !translate-y-0 !rounded-none !p-0 !gap-0 overflow-hidden",
+        )}
+        onEscapeKeyDown={(e) => {
+          if (isFullscreen) {
+            e.preventDefault()
+            void exitFullscreen()
+          }
+        }}
+      >
+        {!isCssFullscreen && (
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 pr-8">
+              <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary/10 text-primary">
+                <MapPin className="h-4 w-4" />
+              </span>
+              <span>Set Lokasi ONU: {onu?.name}</span>
+            </DialogTitle>
+            <DialogDescription className="flex flex-wrap items-center gap-1.5 pt-1">
+              <Badge variant="outline">{oltName}</Badge>
+              <Badge variant="secondary" className="font-mono">
+                PON {onu?.ponPort}:{onu?.onuIndex}
+              </Badge>
+              <Badge variant="secondary" className="font-mono">
+                SN: {onu?.serialNumber}
+              </Badge>
+            </DialogDescription>
+          </DialogHeader>
+        )}
 
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs text-muted-foreground">Klik pada peta untuk menandai titik lokasi, geser marker, atau ketik koordinat manual.</p>
-          <Tabs value={layer} onValueChange={(v) => setLayer(v as MapLayerMode)}>
-            <TabsList className="h-8">
-              <TabsTrigger value="satellite" className="h-6 px-2.5 text-xs">
-                <Layers className="h-3.5 w-3.5" />
-                Satelit
-              </TabsTrigger>
-              <TabsTrigger value="esri" className="h-6 px-2.5 text-xs">
-                <Layers className="h-3.5 w-3.5" />
-                Esri
-              </TabsTrigger>
-              <TabsTrigger value="osm" className="h-6 px-2.5 text-xs">
-                <Globe className="h-3.5 w-3.5" />
-                OSM
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
+        {!isCssFullscreen && (
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-muted-foreground">Klik pada peta untuk menandai titik lokasi, geser marker, atau ketik koordinat manual.</p>
+            <Tabs value={layer} onValueChange={(v) => setLayer(v as MapLayerMode)}>
+              <TabsList className="h-8">
+                <TabsTrigger value="satellite" className="h-6 px-2.5 text-xs">
+                  <Layers className="h-3.5 w-3.5" />
+                  Satelit
+                </TabsTrigger>
+                <TabsTrigger value="esri" className="h-6 px-2.5 text-xs">
+                  <Layers className="h-3.5 w-3.5" />
+                  Esri
+                </TabsTrigger>
+                <TabsTrigger value="osm" className="h-6 px-2.5 text-xs">
+                  <Globe className="h-3.5 w-3.5" />
+                  OSM
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+        )}
 
-        <div className="isolate relative h-[230px] w-full overflow-hidden rounded-xl border sm:h-[340px]">
+        <div
+          ref={containerRef}
+          className={cn(
+            "isolate relative overflow-hidden",
+            isCssFullscreen ? "z-30 h-full w-full rounded-none border-0" : "h-[230px] w-full rounded-xl border sm:h-[340px]",
+          )}
+        >
+          <MapOverlayControls
+            isFullscreen={isFullscreen}
+            onToggleFullscreen={toggleFullscreen}
+            layer={layer}
+            onLayerChange={setLayer}
+          />
           {open && (
-            <MapContainer center={[centerLat, centerLng]} zoom={parsedLat ? 16 : mapSettings.defaultZoom} maxZoom={20} className="h-full w-full">
+            <MapContainer center={[centerLat, centerLng]} zoom={parsedLat ? 16 : mapSettings.defaultZoom} maxZoom={21} className="h-full w-full">
               <MapTileLayers layer={layer} />
+              <MapResizeSync trigger={`${open}-${isFullscreen}`} />
               <MapClickHandler
                 onPick={(pickedLat, pickedLng) => {
                   setLat(pickedLat.toFixed(6))
@@ -161,92 +199,96 @@ export function OnuLocationDialog({
           )}
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="onu-lat">Latitude</Label>
-            <Input
-              id="onu-lat"
-              className="font-mono text-xs"
-              value={lat}
-              onChange={(e) => setLat(e.target.value)}
-              placeholder="-2.976100"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="onu-lng">Longitude</Label>
-            <Input
-              id="onu-lng"
-              className="font-mono text-xs"
-              value={lng}
-              onChange={(e) => setLng(e.target.value)}
-              placeholder="104.775400"
-            />
-          </div>
-        </div>
+        {!isCssFullscreen && (
+          <>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="onu-lat">Latitude</Label>
+                <Input
+                  id="onu-lat"
+                  className="font-mono text-xs"
+                  value={lat}
+                  onChange={(e) => setLat(e.target.value)}
+                  placeholder="-2.976100"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="onu-lng">Longitude</Label>
+                <Input
+                  id="onu-lng"
+                  className="font-mono text-xs"
+                  value={lng}
+                  onChange={(e) => setLng(e.target.value)}
+                  placeholder="104.775400"
+                />
+              </div>
+            </div>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="onu-note">Catatan Lokasi (opsional)</Label>
-          <Textarea
-            id="onu-note"
-            className="min-h-[64px]"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Contoh: Tiang 04 / Rumah pagar biru dekat pertigaan"
-          />
-        </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="onu-note">Catatan Lokasi (opsional)</Label>
+              <Textarea
+                id="onu-note"
+                className="min-h-[64px]"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="Contoh: Tiang 04 / Rumah pagar biru dekat pertigaan"
+              />
+            </div>
 
-        <Separator />
+            <Separator />
 
-        <DialogFooter className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
-          {onu?.latitude != null ? (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button type="button" variant="destructive" size="sm" className="w-full sm:w-auto" disabled={saving}>
-                  <Trash2 className="h-4 w-4" />
-                  Hapus Titik
+            <DialogFooter className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
+              {onu?.latitude != null ? (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button type="button" variant="destructive" size="sm" className="w-full sm:w-auto" disabled={saving}>
+                      <Trash2 className="h-4 w-4" />
+                      Hapus Titik
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Hapus titik lokasi ONU?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Koordinat peta untuk <b>{onu.name}</b> akan dihapus dari SQLite. Anda bisa menandainya kembali kapan saja.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Batal</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        onClick={async () => {
+                          if (!onu) return
+                          setSaving(true)
+                          try {
+                            await onClear(onu.id)
+                            onOpenChange(false)
+                          } finally {
+                            setSaving(false)
+                          }
+                        }}
+                      >
+                        Hapus Titik
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              ) : (
+                <div className="hidden sm:block" />
+              )}
+
+              <div className="grid grid-cols-2 gap-2 sm:flex">
+                <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => onOpenChange(false)}>
+                  Batal
                 </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Hapus titik lokasi ONU?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Koordinat peta untuk <b>{onu.name}</b> akan dihapus dari SQLite. Anda bisa menandainya kembali kapan saja.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Batal</AlertDialogCancel>
-                  <AlertDialogAction
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    onClick={async () => {
-                      if (!onu) return
-                      setSaving(true)
-                      try {
-                        await onClear(onu.id)
-                        onOpenChange(false)
-                      } finally {
-                        setSaving(false)
-                      }
-                    }}
-                  >
-                    Hapus Titik
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          ) : (
-            <div className="hidden sm:block" />
-          )}
-
-          <div className="grid grid-cols-2 gap-2 sm:flex">
-            <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => onOpenChange(false)}>
-              Batal
-            </Button>
-            <Button type="button" className="w-full sm:w-auto" disabled={saving || parsedLat === null || parsedLng === null} onClick={handleSave}>
-              <Save className="h-4 w-4" />
-              {saving ? "Menyimpan..." : "Simpan Lokasi"}
-            </Button>
-          </div>
-        </DialogFooter>
+                <Button type="button" className="w-full sm:w-auto" disabled={saving || parsedLat === null || parsedLng === null} onClick={handleSave}>
+                  <Save className="h-4 w-4" />
+                  {saving ? "Menyimpan..." : "Simpan Lokasi"}
+                </Button>
+              </div>
+            </DialogFooter>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   )
