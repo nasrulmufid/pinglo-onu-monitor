@@ -173,13 +173,13 @@ export function BulkLocationImportDialog({
           </Alert>
         ) : (
           <div className="space-y-4">
-            <div className="rounded-2xl border bg-muted/25 p-4 space-y-3">
+            <div className="rounded-2xl border bg-muted/25 p-3.5 sm:p-4 space-y-3">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="space-y-1">
                   <Label className="text-xs font-semibold">1. Pilih OLT &amp; Download Template</Label>
                   <div className="flex flex-wrap items-center gap-2 pt-0.5">
                     <Select value={selectedOltId} onValueChange={setSelectedOltId}>
-                      <SelectTrigger className="w-[220px] bg-background">
+                      <SelectTrigger className="w-full bg-background sm:w-[220px]">
                         <SelectValue placeholder="Pilih OLT" />
                       </SelectTrigger>
                       <SelectContent>
@@ -199,14 +199,14 @@ export function BulkLocationImportDialog({
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button type="button" size="sm" variant="secondary" disabled={!selectedOlt || oltOnus.length === 0} onClick={() => handleDownload("xlsx")}>
+                <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center">
+                  <Button type="button" size="sm" variant="secondary" className="w-full sm:w-auto" disabled={!selectedOlt || oltOnus.length === 0} onClick={() => handleDownload("xlsx")}>
                     <Download className="h-3.5 w-3.5" />
-                    Download Template (.xlsx)
+                    Template (.xlsx)
                   </Button>
-                  <Button type="button" size="sm" variant="outline" disabled={!selectedOlt || oltOnus.length === 0} onClick={() => handleDownload("xls")}>
+                  <Button type="button" size="sm" variant="outline" className="w-full sm:w-auto" disabled={!selectedOlt || oltOnus.length === 0} onClick={() => handleDownload("xls")}>
                     <Download className="h-3.5 w-3.5" />
-                    Download (.xls)
+                    Template (.xls)
                   </Button>
                 </div>
               </div>
@@ -321,48 +321,80 @@ export function BulkLocationImportDialog({
                 </div>
 
                 <ScrollArea className="h-[220px] rounded-2xl border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-14">Baris</TableHead>
-                        <TableHead>Nama ONU</TableHead>
-                        <TableHead>SN</TableHead>
-                        <TableHead>Longitude</TableHead>
-                        <TableHead>Latitude</TableHead>
-                        <TableHead>Status / Keterangan</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {visibleRows.length === 0 ? (
+                  <div className="space-y-2 p-2.5 sm:hidden">
+                    {visibleRows.length === 0 ? (
+                      <p className="py-8 text-center text-xs text-muted-foreground">Tidak ada baris pada tab ini.</p>
+                    ) : (
+                      visibleRows.map((row) => (
+                        <div key={`mob-${row.rowNumber}-${row.serialNumber}-${row.name}`} className="rounded-xl border bg-muted/15 p-2.5 text-xs space-y-1.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="truncate font-semibold">{row.matchedName ?? (row.name || "-")}</p>
+                              <p className="font-mono text-[11px] text-muted-foreground">
+                                Baris {row.rowNumber} • SN: {row.serialNumber || "-"}
+                              </p>
+                            </div>
+                            <Badge
+                              variant={row.status === "valid" ? "success" : row.status === "error" ? "destructive" : "secondary"}
+                              className="shrink-0 text-[10px]"
+                            >
+                              {row.status === "valid" ? "Valid" : row.status === "error" ? "Error" : "Lewati"}
+                            </Badge>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono text-[11px]">
+                            <span>Lng: {row.longitude ?? (row.longitudeRaw || "-")}</span>
+                            <span>Lat: {row.latitude ?? (row.latitudeRaw || "-")}</span>
+                          </div>
+                          <p className="text-[11px] text-muted-foreground">{row.reason}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  <div className="hidden sm:block">
+                    <Table>
+                      <TableHeader>
                         <TableRow>
-                          <TableCell colSpan={6} className="py-8 text-center text-xs text-muted-foreground">
-                            Tidak ada baris pada tab ini.
-                          </TableCell>
+                          <TableHead className="w-14">Baris</TableHead>
+                          <TableHead>Nama ONU</TableHead>
+                          <TableHead>SN</TableHead>
+                          <TableHead>Longitude</TableHead>
+                          <TableHead>Latitude</TableHead>
+                          <TableHead>Status / Keterangan</TableHead>
                         </TableRow>
-                      ) : (
-                        visibleRows.map((row) => (
-                          <TableRow key={`${row.rowNumber}-${row.serialNumber}-${row.name}`}>
-                            <TableCell className="font-mono text-xs text-muted-foreground">{row.rowNumber}</TableCell>
-                            <TableCell className="text-xs font-medium">{row.matchedName ?? (row.name || "-")}</TableCell>
-                            <TableCell className="font-mono text-xs text-muted-foreground">{row.serialNumber || "-"}</TableCell>
-                            <TableCell className="font-mono text-xs">{row.longitude ?? (row.longitudeRaw || "-")}</TableCell>
-                            <TableCell className="font-mono text-xs">{row.latitude ?? (row.latitudeRaw || "-")}</TableCell>
-                            <TableCell>
-                              <div className="flex flex-wrap items-center gap-1.5">
-                                <Badge
-                                  variant={row.status === "valid" ? "success" : row.status === "error" ? "destructive" : "secondary"}
-                                  className="text-[10px]"
-                                >
-                                  {row.status === "valid" ? "Valid" : row.status === "error" ? "Error" : "Lewati"}
-                                </Badge>
-                                <span className="text-[11px] text-muted-foreground">{row.reason}</span>
-                              </div>
+                      </TableHeader>
+                      <TableBody>
+                        {visibleRows.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={6} className="py-8 text-center text-xs text-muted-foreground">
+                              Tidak ada baris pada tab ini.
                             </TableCell>
                           </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
+                        ) : (
+                          visibleRows.map((row) => (
+                            <TableRow key={`${row.rowNumber}-${row.serialNumber}-${row.name}`}>
+                              <TableCell className="font-mono text-xs text-muted-foreground">{row.rowNumber}</TableCell>
+                              <TableCell className="text-xs font-medium">{row.matchedName ?? (row.name || "-")}</TableCell>
+                              <TableCell className="font-mono text-xs text-muted-foreground">{row.serialNumber || "-"}</TableCell>
+                              <TableCell className="font-mono text-xs">{row.longitude ?? (row.longitudeRaw || "-")}</TableCell>
+                              <TableCell className="font-mono text-xs">{row.latitude ?? (row.latitudeRaw || "-")}</TableCell>
+                              <TableCell>
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <Badge
+                                    variant={row.status === "valid" ? "success" : row.status === "error" ? "destructive" : "secondary"}
+                                    className="text-[10px]"
+                                  >
+                                    {row.status === "valid" ? "Valid" : row.status === "error" ? "Error" : "Lewati"}
+                                  </Badge>
+                                  <span className="text-[11px] text-muted-foreground">{row.reason}</span>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </ScrollArea>
               </div>
             )}
@@ -372,10 +404,15 @@ export function BulkLocationImportDialog({
         <Separator />
 
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => handleClose(false)}>
+          <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => handleClose(false)}>
             Batal
           </Button>
-          <Button type="button" disabled={saving || !selectedOlt || validRows.length === 0} onClick={() => void handleSaveBulk()}>
+          <Button
+            type="button"
+            className="w-full sm:w-auto"
+            disabled={saving || !selectedOlt || validRows.length === 0}
+            onClick={() => void handleSaveBulk()}
+          >
             <Upload className="h-4 w-4" />
             {saving ? "Menyimpan..." : `Simpan ${validRows.length} Titik Koordinat`}
           </Button>

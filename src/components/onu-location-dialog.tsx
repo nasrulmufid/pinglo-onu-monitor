@@ -130,7 +130,7 @@ export function OnuLocationDialog({
           </Tabs>
         </div>
 
-        <div className="isolate relative h-[340px] w-full overflow-hidden rounded-xl border">
+        <div className="isolate relative h-[230px] w-full overflow-hidden rounded-xl border sm:h-[340px]">
           {open && (
             <MapContainer center={[centerLat, centerLng]} zoom={parsedLat ? 16 : mapSettings.defaultZoom} maxZoom={20} className="h-full w-full">
               <MapTileLayers layer={layer} />
@@ -201,7 +201,7 @@ export function OnuLocationDialog({
           {onu?.latitude != null ? (
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button type="button" variant="destructive" size="sm" disabled={saving}>
+                <Button type="button" variant="destructive" size="sm" className="w-full sm:w-auto" disabled={saving}>
                   <Trash2 className="h-4 w-4" />
                   Hapus Titik
                 </Button>
@@ -234,14 +234,14 @@ export function OnuLocationDialog({
               </AlertDialogContent>
             </AlertDialog>
           ) : (
-            <div />
+            <div className="hidden sm:block" />
           )}
 
-          <div className="flex gap-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <div className="grid grid-cols-2 gap-2 sm:flex">
+            <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => onOpenChange(false)}>
               Batal
             </Button>
-            <Button type="button" disabled={saving || parsedLat === null || parsedLng === null} onClick={handleSave}>
+            <Button type="button" className="w-full sm:w-auto" disabled={saving || parsedLat === null || parsedLng === null} onClick={handleSave}>
               <Save className="h-4 w-4" />
               {saving ? "Menyimpan..." : "Simpan Lokasi"}
             </Button>

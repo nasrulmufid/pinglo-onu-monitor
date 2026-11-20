@@ -147,27 +147,29 @@ export function SystemView() {
 
   return (
     <Tabs defaultValue="users" className="space-y-4">
-      <TabsList className="h-auto flex-wrap justify-start gap-1">
-        <TabsTrigger value="users">
-          <UserCog className="h-3.5 w-3.5" />
-          User &amp; Role
-        </TabsTrigger>
-        <TabsTrigger value="audit">
-          <FileClock className="h-3.5 w-3.5" />
-          Audit Log
-          <Badge variant="secondary" className="ml-1 h-4 px-1.5 text-[10px] tabular-nums">
-            {logs.length}
-          </Badge>
-        </TabsTrigger>
-        <TabsTrigger value="startup">
-          <Terminal className="h-3.5 w-3.5" />
-          Startup Service
-        </TabsTrigger>
-        <TabsTrigger value="danger">
-          <ShieldAlert className="h-3.5 w-3.5 text-destructive" />
-          Database &amp; Reset
-        </TabsTrigger>
-      </TabsList>
+      <div className="no-scrollbar w-full overflow-x-auto pb-0.5">
+        <TabsList className="w-max flex-nowrap justify-start gap-1">
+          <TabsTrigger value="users">
+            <UserCog className="h-3.5 w-3.5" />
+            User &amp; Role
+          </TabsTrigger>
+          <TabsTrigger value="audit">
+            <FileClock className="h-3.5 w-3.5" />
+            Audit Log
+            <Badge variant="secondary" className="ml-1 h-4 px-1.5 text-[10px] tabular-nums">
+              {logs.length}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="startup">
+            <Terminal className="h-3.5 w-3.5" />
+            Startup Service
+          </TabsTrigger>
+          <TabsTrigger value="danger">
+            <ShieldAlert className="h-3.5 w-3.5 text-destructive" />
+            Database &amp; Reset
+          </TabsTrigger>
+        </TabsList>
+      </div>
 
       <TabsContent value="users">
         <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
@@ -354,38 +356,59 @@ export function SystemView() {
           </CardHeader>
           <CardContent>
             <ScrollArea className="h-[420px] rounded-xl border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Waktu</TableHead>
-                    <TableHead>Aksi</TableHead>
-                    <TableHead>Aktor</TableHead>
-                    <TableHead>Detail</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredLogs.length === 0 ? (
+              <div className="space-y-2 p-3 md:hidden">
+                {filteredLogs.length === 0 ? (
+                  <p className="py-8 text-center text-xs text-muted-foreground">Tidak ada catatan audit log.</p>
+                ) : (
+                  filteredLogs.slice(0, 50).map((l) => (
+                    <div key={`mob-${l.id}`} className="rounded-xl border bg-muted/15 p-3 text-xs space-y-1.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <Badge variant="outline" className="text-[11px]">
+                          {l.action}
+                        </Badge>
+                        <span className="font-mono text-[11px] font-medium text-foreground">@{l.actor}</span>
+                      </div>
+                      <p className="break-words text-muted-foreground">{l.detail}</p>
+                      <p className="font-mono text-[10px] text-muted-foreground/80">{l.createdAt}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="hidden md:block">
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
-                        Tidak ada catatan audit log.
-                      </TableCell>
+                      <TableHead>Waktu</TableHead>
+                      <TableHead>Aksi</TableHead>
+                      <TableHead>Aktor</TableHead>
+                      <TableHead>Detail</TableHead>
                     </TableRow>
-                  ) : (
-                    filteredLogs.slice(0, 50).map((l) => (
-                      <TableRow key={l.id}>
-                        <TableCell className="whitespace-nowrap font-mono text-[11px] text-muted-foreground">{l.createdAt}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="text-[11px]">
-                            {l.action}
-                          </Badge>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredLogs.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
+                          Tidak ada catatan audit log.
                         </TableCell>
-                        <TableCell className="font-mono text-xs font-medium">@{l.actor}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{l.detail}</TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+                    ) : (
+                      filteredLogs.slice(0, 50).map((l) => (
+                        <TableRow key={l.id}>
+                          <TableCell className="whitespace-nowrap font-mono text-[11px] text-muted-foreground">{l.createdAt}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-[11px]">
+                              {l.action}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="font-mono text-xs font-medium">@{l.actor}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{l.detail}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             </ScrollArea>
           </CardContent>
         </Card>
@@ -414,19 +437,19 @@ export function SystemView() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="text-xs text-muted-foreground">
+              <div className="break-all text-xs text-muted-foreground">
                 Service Path: <code className="rounded bg-muted px-2 py-0.5 font-mono text-foreground">{startup.servicePath}</code>
               </div>
 
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-xs font-semibold">Perintah Aktivasi Startup</p>
                   <Button size="sm" variant="outline" onClick={() => copyCommands(startup.commands, "Perintah aktivasi")}>
                     <Copy className="h-3.5 w-3.5" />
                     Salin
                   </Button>
                 </div>
-                <ScrollArea className="max-h-56 rounded-xl border bg-slate-950 p-3">
+                <ScrollArea className="max-h-56 overflow-x-auto rounded-xl border bg-slate-950 p-3">
                   <pre className="font-mono text-xs leading-relaxed text-emerald-300">{startup.commands.join("\n")}</pre>
                 </ScrollArea>
               </div>
@@ -435,7 +458,7 @@ export function SystemView() {
                 <>
                   <Separator />
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="text-xs font-semibold">Perintah Nonaktifkan Startup</p>
                       <Button
                         size="sm"
@@ -446,7 +469,7 @@ export function SystemView() {
                         Salin
                       </Button>
                     </div>
-                    <ScrollArea className="max-h-44 rounded-xl border bg-slate-950 p-3">
+                    <ScrollArea className="max-h-44 overflow-x-auto rounded-xl border bg-slate-950 p-3">
                       <pre className="font-mono text-xs leading-relaxed text-amber-300">{startup.disableCommands.join("\n")}</pre>
                     </ScrollArea>
                   </div>

@@ -133,9 +133,9 @@ export function OnusView() {
               </CardDescription>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
               <Select value={selectedOltId} onValueChange={setSelectedOltId}>
-                <SelectTrigger className="w-[190px]">
+                <SelectTrigger className="w-full sm:w-[190px]">
                   <SelectValue placeholder="Semua OLT" />
                 </SelectTrigger>
                 <SelectContent>
@@ -148,40 +148,42 @@ export function OnusView() {
                 </SelectContent>
               </Select>
 
-              {selectedOlt ? (
-                <Button disabled={pollingOltId === selectedOlt.id} onClick={() => void pollOnu(selectedOlt)}>
-                  <RefreshCcw className={cn("h-4 w-4", pollingOltId === selectedOlt.id && "animate-spin")} />
-                  Poll ONU
-                </Button>
-              ) : olts.length <= 1 ? (
-                <Button disabled={!olts[0] || pollingOltId === olts[0]?.id} onClick={() => olts[0] && void pollOnu(olts[0])}>
-                  <RefreshCcw className={cn("h-4 w-4", olts[0] && pollingOltId === olts[0].id && "animate-spin")} />
-                  Poll ONU
-                </Button>
-              ) : (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button disabled={Boolean(pollingOltId)}>
-                      <RefreshCcw className={cn("h-4 w-4", pollingOltId && "animate-spin")} />
-                      Poll ONU
-                      <ChevronDown className="h-3.5 w-3.5 opacity-75" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    {olts.map((o) => (
-                      <DropdownMenuItem key={o.id} onClick={() => void pollOnu(o)}>
-                        <RefreshCcw className="h-3.5 w-3.5" />
-                        <span>Poll {o.name}</span>
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
+              <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+                {selectedOlt ? (
+                  <Button className="w-full sm:w-auto" disabled={pollingOltId === selectedOlt.id} onClick={() => void pollOnu(selectedOlt)}>
+                    <RefreshCcw className={cn("h-4 w-4", pollingOltId === selectedOlt.id && "animate-spin")} />
+                    Poll ONU
+                  </Button>
+                ) : olts.length <= 1 ? (
+                  <Button className="w-full sm:w-auto" disabled={!olts[0] || pollingOltId === olts[0]?.id} onClick={() => olts[0] && void pollOnu(olts[0])}>
+                    <RefreshCcw className={cn("h-4 w-4", olts[0] && pollingOltId === olts[0].id && "animate-spin")} />
+                    Poll ONU
+                  </Button>
+                ) : (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button className="w-full sm:w-auto" disabled={Boolean(pollingOltId)}>
+                        <RefreshCcw className={cn("h-4 w-4", pollingOltId && "animate-spin")} />
+                        Poll ONU
+                        <ChevronDown className="h-3.5 w-3.5 opacity-75" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {olts.map((o) => (
+                        <DropdownMenuItem key={o.id} onClick={() => void pollOnu(o)}>
+                          <RefreshCcw className="h-3.5 w-3.5" />
+                          <span>Poll {o.name}</span>
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
 
-              <Button type="button" variant="outline" onClick={() => setImportOpen(true)}>
-                <FileSpreadsheet className="h-4 w-4 text-primary" />
-                Import XLS
-              </Button>
+                <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => setImportOpen(true)}>
+                  <FileSpreadsheet className="h-4 w-4 text-primary" />
+                  Import XLS
+                </Button>
+              </div>
 
               <div className="relative w-full sm:w-64">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -206,7 +208,8 @@ export function OnusView() {
           </div>
 
           <Tabs value={statusTab} onValueChange={(v) => setStatusTab(v as OnuFilterTab)} className="mt-3">
-            <TabsList className="h-auto flex-wrap justify-start gap-1">
+            <div className="no-scrollbar w-full overflow-x-auto pb-0.5">
+              <TabsList className="w-max flex-nowrap justify-start gap-1">
               <TabsTrigger value="all">
                 Semua
                 <Badge variant="secondary" className="ml-1 h-4 px-1.5 text-[10px] tabular-nums">
@@ -238,11 +241,155 @@ export function OnusView() {
                 </Badge>
               </TabsTrigger>
             </TabsList>
+            </div>
           </Tabs>
         </CardHeader>
 
         <CardContent className="space-y-4">
-          <div className="overflow-hidden rounded-xl border">
+          <div className="space-y-2.5 md:hidden">
+            {paginatedOnus.length === 0 ? (
+              <div className="rounded-xl border border-dashed p-8 text-center text-xs text-muted-foreground">
+                {onus.length === 0
+                  ? "Belum ada data ONU. Jalankan Poll ONU terlebih dahulu."
+                  : "Tidak ada ONU yang sesuai dengan filter saat ini."}
+              </div>
+            ) : (
+              paginatedOnus.map((onu) => {
+                const hasCoord = onu.latitude != null && onu.longitude != null
+                const rxMeta = getRxQuality(onu.rxPower)
+                const isHot = onu.temperatureC != null && onu.temperatureC >= 55
+
+                return (
+                  <div key={onu.id} className="rounded-xl border bg-muted/15 p-3.5 space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        {editingOnuId === onu.id ? (
+                          <div className="flex items-center gap-1.5">
+                            <Input
+                              value={draftName}
+                              autoFocus
+                              onChange={(e) => setDraftName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") void commitRename(onu)
+                                if (e.key === "Escape") setEditingOnuId(null)
+                              }}
+                            />
+                            <Button
+                              size="icon"
+                              className="shrink-0"
+                              disabled={renaming || !draftName.trim()}
+                              onClick={() => void commitRename(onu)}
+                              aria-label="Simpan nama"
+                            >
+                              <Check className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              className="shrink-0"
+                              onClick={() => setEditingOnuId(null)}
+                              aria-label="Batal rename"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <>
+                            <p className="truncate text-sm font-semibold">{onu.name}</p>
+                            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                              {selectedOltId === "all" && <span>{oltNameMap.get(onu.oltId) ?? "-"}</span>}
+                              <Badge variant="outline" className="font-mono text-[10px]">
+                                PON {onu.ponPort}:{onu.onuIndex}
+                              </Badge>
+                              <span className="font-mono">{onu.serialNumber}</span>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                      <StatusBadge value={onu.status} className="shrink-0" />
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 rounded-xl border bg-background/70 p-2.5 text-xs">
+                      <div>
+                        <p className="text-[10px] text-muted-foreground">Sinyal RX</p>
+                        <p
+                          className={cn(
+                            "mt-0.5 font-mono text-[11px] font-semibold tabular-nums",
+                            rxMeta.tone === "bad"
+                              ? "text-red-600 dark:text-red-400"
+                              : rxMeta.tone === "warn"
+                                ? "text-amber-600 dark:text-amber-400"
+                                : rxMeta.tone === "good"
+                                  ? "text-emerald-600 dark:text-emerald-400"
+                                  : "text-muted-foreground",
+                          )}
+                        >
+                          {formatRx(onu.rxPower)}
+                        </p>
+                        <Progress
+                          value={rxMeta.percent}
+                          className="mt-1 h-1"
+                          indicatorClassName={
+                            rxMeta.tone === "bad"
+                              ? "bg-red-500"
+                              : rxMeta.tone === "warn"
+                                ? "bg-amber-500"
+                                : rxMeta.tone === "good"
+                                  ? "bg-emerald-500"
+                                  : "bg-muted-foreground/30"
+                          }
+                        />
+                      </div>
+
+                      <div>
+                        <p className="text-[10px] text-muted-foreground">Suhu</p>
+                        <p
+                          className={cn(
+                            "mt-0.5 font-mono text-[11px] font-semibold tabular-nums",
+                            isHot ? "text-amber-600 dark:text-amber-400" : "text-foreground",
+                          )}
+                        >
+                          {formatTemp(onu.temperatureC)}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="text-[10px] text-muted-foreground">Peta</p>
+                        <button type="button" onClick={() => setLocationDialogOnu(onu)} className="mt-0.5 block">
+                          <Badge variant={hasCoord ? "success" : "secondary"} className="h-5 px-1.5 text-[10px]">
+                            {hasCoord ? "Terpetakan" : "Belum diset"}
+                          </Badge>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-[1fr_auto_auto] gap-1.5">
+                      <Button size="sm" variant="outline" onClick={() => setLocationDialogOnu(onu)}>
+                        <MapPin className="h-3.5 w-3.5 text-primary" />
+                        {hasCoord ? "Edit Lokasi" : "Set Lokasi"}
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        onClick={() => {
+                          setEditingOnuId(onu.id)
+                          setDraftName(onu.name)
+                        }}
+                        aria-label={`Rename ${onu.name}`}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button size="icon" variant="secondary" onClick={() => setDetailOnu(onu)} aria-label={`Detail ${onu.name}`}>
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )
+              })
+            )}
+          </div>
+
+          <div className="hidden overflow-hidden rounded-xl border md:block">
             <Table className="min-w-[960px]">
               <TableHeader>
                 <TableRow>
@@ -455,7 +602,7 @@ export function OnusView() {
               <b className="text-foreground">{filteredOnus.length}</b> ONU
             </p>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center justify-between gap-2 sm:justify-end">
               <span className="text-xs text-muted-foreground">Baris:</span>
               <Select value={pageSize} onValueChange={setPageSize}>
                 <SelectTrigger className="h-8 w-[76px] text-xs">

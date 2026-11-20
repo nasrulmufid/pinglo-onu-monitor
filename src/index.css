@@ -125,10 +125,24 @@
     @apply border-border outline-ring/50;
   }
 
+  html,
+  body {
+    overflow-x: clip;
+  }
+
   body {
     @apply bg-background font-sans text-foreground antialiased selection:bg-primary/20 selection:text-foreground;
     margin: 0;
   }
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
 .cn-font-heading {

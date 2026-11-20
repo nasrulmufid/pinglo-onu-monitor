@@ -57,7 +57,7 @@ export function AlertsView() {
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
         <Card>
           <CardContent className="flex items-center justify-between p-4">
             <div>
@@ -117,7 +117,7 @@ export function AlertsView() {
               </CardDescription>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
               <div className="relative w-full sm:w-64">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -138,17 +138,18 @@ export function AlertsView() {
                 )}
               </div>
 
-              <Button size="sm" variant="outline" onClick={() => void clearAlerts("acknowledged")}>
-                Bersihkan Selesai
-              </Button>
+              <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+                <Button size="sm" variant="outline" className="w-full sm:w-auto" onClick={() => void clearAlerts("acknowledged")}>
+                  Bersihkan Selesai
+                </Button>
 
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button size="sm" variant="destructive">
-                    <Trash2 className="h-3.5 w-3.5" />
-                    Bersihkan Semua
-                  </Button>
-                </AlertDialogTrigger>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button size="sm" variant="destructive" className="w-full sm:w-auto">
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Bersihkan Semua
+                    </Button>
+                  </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
                     <AlertDialogTitle>Bersihkan seluruh riwayat alert?</AlertDialogTitle>
@@ -165,13 +166,15 @@ export function AlertsView() {
                       Ya, Bersihkan Semua
                     </AlertDialogAction>
                   </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
             </div>
           </div>
 
           <Tabs value={tab} onValueChange={(v) => setTab(v as AlertTab)} className="mt-3">
-            <TabsList className="h-auto flex-wrap justify-start gap-1">
+            <div className="no-scrollbar w-full overflow-x-auto pb-0.5">
+              <TabsList className="w-max flex-nowrap justify-start gap-1">
               <TabsTrigger value="all">
                 Semua
                 <Badge variant="secondary" className="ml-1 h-4 px-1.5 text-[10px] tabular-nums">
@@ -198,11 +201,12 @@ export function AlertsView() {
               </TabsTrigger>
               <TabsTrigger value="acknowledged">
                 Selesai
-                <Badge variant="secondary" className="ml-1 h-4 px-1.5 text-[10px] tabular-nums">
+                <Badge variant={counts.acknowledged > 0 ? "secondary" : "secondary"} className="ml-1 h-4 px-1.5 text-[10px] tabular-nums">
                   {counts.acknowledged}
                 </Badge>
               </TabsTrigger>
             </TabsList>
+            </div>
           </Tabs>
         </CardHeader>
 
@@ -228,7 +232,7 @@ export function AlertsView() {
                   <div
                     key={alert.id}
                     className={cn(
-                      "flex flex-col justify-between gap-3 rounded-xl border border-l-4 bg-card p-4 transition-colors hover:bg-muted/25 sm:flex-row sm:items-start",
+                      "flex flex-col justify-between gap-3 break-words rounded-xl border border-l-4 bg-card p-3.5 transition-colors hover:bg-muted/25 sm:flex-row sm:items-start sm:p-4",
                       alert.severity === "critical"
                         ? "border-l-red-500"
                         : alert.severity === "warning"

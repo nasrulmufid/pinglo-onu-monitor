@@ -85,9 +85,9 @@ export function MapOnuPage() {
   return (
     <div className="space-y-4">
       <Card>
-        <CardContent className="space-y-3 p-4">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <div className="relative min-w-[200px] flex-1">
+        <CardContent className="space-y-3 p-3.5 sm:p-4">
+          <div className="flex flex-col gap-2.5 lg:flex-row lg:flex-wrap lg:items-center">
+            <div className="relative w-full lg:min-w-[200px] lg:flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 className="pl-9 pr-8"
@@ -107,75 +107,79 @@ export function MapOnuPage() {
               )}
             </div>
 
-            <Select
-              value={oltFilter}
-              onValueChange={(v) => {
-                setOltFilter(v)
-                setPonFilter("all")
-              }}
-            >
-              <SelectTrigger className="w-[165px]">
-                <SelectValue placeholder="Semua OLT" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Semua OLT</SelectItem>
-                {olts.map((o) => (
-                  <SelectItem key={o.id} value={o.id}>
-                    {o.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+              <Select
+                value={oltFilter}
+                onValueChange={(v) => {
+                  setOltFilter(v)
+                  setPonFilter("all")
+                }}
+              >
+                <SelectTrigger className="w-full sm:w-[155px]">
+                  <SelectValue placeholder="Semua OLT" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua OLT</SelectItem>
+                  {olts.map((o) => (
+                    <SelectItem key={o.id} value={o.id}>
+                      {o.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-            <Select value={ponFilter} onValueChange={setPonFilter}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Semua PON" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Semua PON</SelectItem>
-                {ponOptions.map((pon) => (
-                  <SelectItem key={pon} value={pon}>
-                    PON {pon}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <Select value={ponFilter} onValueChange={setPonFilter}>
+                <SelectTrigger className="w-full sm:w-[140px]">
+                  <SelectValue placeholder="Semua PON" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua PON</SelectItem>
+                  {ponOptions.map((pon) => (
+                    <SelectItem key={pon} value={pon}>
+                      PON {pon}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as "all" | "online" | "offline")}>
-              <SelectTrigger className="w-[165px]">
-                <SelectValue placeholder="Semua Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Semua Status</SelectItem>
-                <SelectItem value="online">Online (Hijau)</SelectItem>
-                <SelectItem value="offline">Offline (Merah)</SelectItem>
-              </SelectContent>
-            </Select>
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as "all" | "online" | "offline")}>
+                <SelectTrigger className="col-span-2 w-full sm:col-span-1 sm:w-[155px]">
+                  <SelectValue placeholder="Semua Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Status</SelectItem>
+                  <SelectItem value="online">Online (Hijau)</SelectItem>
+                  <SelectItem value="offline">Offline (Merah)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-            <Tabs value={layer} onValueChange={(v) => setLayer(v as MapLayerMode)}>
-              <TabsList className="h-9">
-                <TabsTrigger value="satellite" className="text-xs">
-                  <Layers className="h-3.5 w-3.5" />
-                  Satelit
-                </TabsTrigger>
-                <TabsTrigger value="esri" className="text-xs">
-                  <Layers className="h-3.5 w-3.5" />
-                  Esri
-                </TabsTrigger>
-                <TabsTrigger value="osm" className="text-xs">
-                  <Globe className="h-3.5 w-3.5" />
-                  OSM
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Tabs value={layer} onValueChange={(v) => setLayer(v as MapLayerMode)}>
+                <TabsList className="h-9">
+                  <TabsTrigger value="satellite" className="text-xs">
+                    <Layers className="h-3.5 w-3.5" />
+                    Satelit
+                  </TabsTrigger>
+                  <TabsTrigger value="esri" className="text-xs">
+                    <Layers className="h-3.5 w-3.5" />
+                    Esri
+                  </TabsTrigger>
+                  <TabsTrigger value="osm" className="text-xs">
+                    <Globe className="h-3.5 w-3.5" />
+                    OSM
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
 
-            <Button type="button" variant="outline" onClick={() => setImportOpen(true)}>
-              <FileSpreadsheet className="h-4 w-4 text-primary" />
-              Import XLS
-            </Button>
+              <Button type="button" variant="outline" onClick={() => setImportOpen(true)}>
+                <FileSpreadsheet className="h-4 w-4 text-primary" />
+                Import XLS
+              </Button>
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+          <div className="flex flex-col items-start gap-2 pt-1 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="success" className="gap-1.5 tabular-nums">
                 <Wifi className="h-3 w-3" />
@@ -212,14 +216,15 @@ export function MapOnuPage() {
               </AlertDescription>
             </div>
           </div>
-          <div className="flex items-center gap-2 pl-0">
-            <Button size="sm" disabled={!draftCoord || saving} onClick={() => void handleQuickSave()}>
+          <div className="grid w-full grid-cols-2 gap-2 pl-0 sm:flex sm:w-auto sm:items-center">
+            <Button size="sm" className="w-full sm:w-auto" disabled={!draftCoord || saving} onClick={() => void handleQuickSave()}>
               <Save className="h-3.5 w-3.5" />
               {saving ? "Menyimpan..." : "Simpan Titik"}
             </Button>
             <Button
               size="sm"
               variant="outline"
+              className="w-full sm:w-auto"
               onClick={() => {
                 setAssigningOnu(null)
                 setDraftCoord(null)
@@ -233,7 +238,7 @@ export function MapOnuPage() {
       )}
 
       <div className="grid gap-4 xl:grid-cols-[1fr_330px]">
-        <Card className="isolate relative h-[620px] overflow-hidden">
+        <Card className="isolate relative h-[52vh] min-h-[340px] max-h-[520px] overflow-hidden xl:h-[620px] xl:max-h-none">
           <MapContainer center={[mapSettings.defaultLat, mapSettings.defaultLng]} zoom={mapSettings.defaultZoom} maxZoom={20} className="h-full w-full">
             <MapTileLayers layer={layer} />
 
@@ -282,7 +287,7 @@ export function MapOnuPage() {
           </MapContainer>
         </Card>
 
-        <Card className="flex h-[620px] flex-col">
+        <Card className="flex h-[360px] flex-col xl:h-[620px]">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between gap-2">
               <CardTitle className="text-sm">ONU Belum Punya Lokasi</CardTitle>

@@ -54,16 +54,18 @@ export function SettingsView() {
 
   return (
     <Tabs defaultValue="map" className="space-y-4">
-      <TabsList>
-        <TabsTrigger value="map">
-          <Map className="h-3.5 w-3.5" />
-          Peta Default
-        </TabsTrigger>
-        <TabsTrigger value="oid">
-          <Radio className="h-3.5 w-3.5" />
-          Profil OID &amp; Collector SNMP
-        </TabsTrigger>
-      </TabsList>
+      <div className="no-scrollbar w-full overflow-x-auto pb-0.5">
+        <TabsList className="w-max flex-nowrap">
+          <TabsTrigger value="map">
+            <Map className="h-3.5 w-3.5" />
+            Peta Default
+          </TabsTrigger>
+          <TabsTrigger value="oid">
+            <Radio className="h-3.5 w-3.5" />
+            Profil OID &amp; Collector SNMP
+          </TabsTrigger>
+        </TabsList>
+      </div>
 
       <TabsContent value="map">
         <div className="grid gap-4 lg:grid-cols-2">
@@ -115,7 +117,7 @@ export function SettingsView() {
                 </div>
               </CardContent>
               <CardFooter>
-                <Button type="submit" disabled={saving}>
+                <Button type="submit" className="w-full sm:w-auto" disabled={saving}>
                   <Save className="h-4 w-4" />
                   {saving ? "Menyimpan..." : "Simpan Pengaturan Peta"}
                 </Button>
@@ -165,13 +167,15 @@ export function SettingsView() {
           </CardHeader>
           <CardContent>
             <Tabs defaultValue={oidProfiles[0].key}>
-              <TabsList className="h-auto flex-wrap justify-start gap-1">
-                {oidProfiles.map((profile) => (
-                  <TabsTrigger key={profile.key} value={profile.key}>
-                    {profile.name}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
+              <div className="no-scrollbar w-full overflow-x-auto pb-0.5">
+                <TabsList className="w-max flex-nowrap justify-start gap-1">
+                  {oidProfiles.map((profile) => (
+                    <TabsTrigger key={profile.key} value={profile.key}>
+                      {profile.name}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </div>
 
               {oidProfiles.map((profile) => (
                 <TabsContent key={profile.key} value={profile.key} className="space-y-3">
@@ -190,7 +194,43 @@ export function SettingsView() {
                     )}
                   </div>
 
-                  <div className="overflow-hidden rounded-xl border">
+                  <div className="space-y-2 sm:hidden">
+                    {profile.items.map((item) => (
+                      <div key={`mob-${profile.key}-${item.key}`} className="flex items-start justify-between gap-2 rounded-xl border bg-muted/15 p-3">
+                        <div className="min-w-0 space-y-1">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-xs font-semibold">{item.label}</span>
+                            <Badge
+                              variant={
+                                item.kind === "optical"
+                                  ? "info"
+                                  : item.kind === "ont"
+                                    ? "success"
+                                    : item.kind === "system"
+                                      ? "secondary"
+                                      : "outline"
+                              }
+                              className="text-[10px] uppercase"
+                            >
+                              {item.kind}
+                            </Badge>
+                          </div>
+                          <p className="break-all font-mono text-[11px] text-muted-foreground">{item.oid}</p>
+                        </div>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="shrink-0"
+                          onClick={() => copyOid(item.oid)}
+                          aria-label={`Salin ${item.oid}`}
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="hidden overflow-hidden rounded-xl border sm:block">
                     <Table>
                       <TableHeader>
                         <TableRow>

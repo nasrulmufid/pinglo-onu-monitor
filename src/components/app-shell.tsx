@@ -133,6 +133,7 @@ export function AppShell({ children }: { children?: React.ReactNode }) {
 
   const pageMeta = titles[pathname] ?? titles["/"]
   const accessibleNav = navItems.filter((item) => canAccessPath(session.role, item.href))
+  const bottomNavItems = accessibleNav.filter((item) => ["/", "/olts", "/onus", "/map", "/alerts"].includes(item.href))
   const groups = (["Monitoring", "Administrasi", "Informasi"] as const)
     .map((group) => ({ group, items: accessibleNav.filter((item) => item.group === group) }))
     .filter((entry) => entry.items.length > 0)
@@ -210,7 +211,7 @@ export function AppShell({ children }: { children?: React.ReactNode }) {
   )
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen overflow-x-clip bg-background text-foreground">
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-sidebar-border bg-sidebar text-sidebar-foreground lg:flex lg:flex-col">
         <div className="flex h-16 items-center gap-3 border-b border-sidebar-border px-5">
           <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-cyan-400 via-emerald-400 to-sky-500 text-slate-950 shadow-sm">
@@ -240,7 +241,7 @@ export function AppShell({ children }: { children?: React.ReactNode }) {
       </Sheet>
 
       <div className="lg:pl-64">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b bg-background/80 px-4 backdrop-blur-xl lg:px-6">
+        <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-2 border-b bg-background/80 px-3 backdrop-blur-xl sm:h-16 sm:gap-3 sm:px-4 lg:px-6">
           <div className="flex min-w-0 items-center gap-3">
             <Button
               size="icon"
@@ -286,7 +287,7 @@ export function AppShell({ children }: { children?: React.ReactNode }) {
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="h-9 gap-2 pl-1.5 pr-2.5">
+                <Button variant="outline" className="h-8 gap-1.5 pl-1 pr-2 sm:h-9 sm:gap-2 sm:pl-1.5 sm:pr-2.5">
                   <Avatar className="h-6 w-6">
                     <AvatarFallback className="text-[10px]">{getInitials(session.name)}</AvatarFallback>
                   </Avatar>
@@ -328,8 +329,44 @@ export function AppShell({ children }: { children?: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="mx-auto max-w-[1600px] p-4 lg:p-6">{children ?? <Outlet />}</main>
+        <main className="mx-auto max-w-[1600px] px-3 py-3.5 pb-[calc(4.75rem+env(safe-area-inset-bottom))] sm:px-4 sm:py-4 lg:p-6">
+          {children ?? <Outlet />}
+        </main>
       </div>
+
+      <nav
+        aria-label="Navigasi cepat mobile"
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-border/80 bg-background/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden"
+      >
+        <div className="grid h-16 grid-cols-5 items-center px-1">
+          {bottomNavItems.map((item) => {
+            const Icon = item.icon
+            const active = pathname === item.href
+            const shortLabel = item.href === "/onus" ? "ONU" : item.href === "/map" ? "Map" : item.label
+            const showAlertDot = item.href === "/alerts" && openAlertCount > 0
+            return (
+              <Link
+                key={item.href}
+                to={item.href}
+                className={cn(
+                  "relative flex flex-col items-center justify-center gap-1 rounded-xl py-1 text-[11px] font-medium transition-colors",
+                  active ? "text-primary" : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <div className={cn("relative grid h-7 w-11 place-items-center rounded-2xl transition-colors", active && "bg-primary/15")}>
+                  <Icon className="h-4 w-4" />
+                  {showAlertDot && (
+                    <span className="absolute right-1 top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground tabular-nums">
+                      {openAlertCount > 99 ? "99+" : openAlertCount}
+                    </span>
+                  )}
+                </div>
+                <span className="truncate">{shortLabel}</span>
+              </Link>
+            )
+          })}
+        </div>
+      </nav>
 
       <OnuLocationDialog
         onu={locationDialogOnu}

@@ -89,7 +89,7 @@ export function LoginForm() {
   }
 
   return (
-    <main className="bg-dot-grid relative grid min-h-screen place-items-center bg-background px-4 py-10">
+    <main className="bg-dot-grid relative grid min-h-screen place-items-center bg-background px-3.5 py-6 sm:px-4 sm:py-10">
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-cyan-500/5 via-transparent to-emerald-500/5" />
 
       <div className="absolute right-4 top-4 z-10">
@@ -103,7 +103,21 @@ export function LoginForm() {
         </Tooltip>
       </div>
 
-      <div className="relative z-10 grid w-full max-w-5xl items-center gap-10 lg:grid-cols-[1.15fr_420px]">
+      <div className="relative z-10 grid w-full max-w-5xl items-center gap-6 sm:gap-10 lg:grid-cols-[1.15fr_420px]">
+        <div className="flex items-center gap-3 lg:hidden">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-cyan-400 via-emerald-400 to-sky-500 text-slate-950 shadow-sm">
+            <Network className="h-5 w-5" />
+          </span>
+          <div>
+            <div className="flex items-center gap-2">
+              <p className="cn-font-heading text-base font-bold">PingLo</p>
+              <Badge variant="info" className="text-[10px]">
+                NOC Edition
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground">OLT &amp; ONU Operations Center</p>
+          </div>
+        </div>
         <div className="hidden space-y-6 lg:block">
           <div className="inline-flex items-center gap-3 rounded-2xl border bg-card/90 px-4 py-2.5 shadow-sm backdrop-blur">
             <span className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-cyan-400 via-emerald-400 to-sky-500 text-slate-950">

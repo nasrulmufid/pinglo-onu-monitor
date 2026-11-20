@@ -122,7 +122,7 @@ export function OltsView() {
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 xl:grid-cols-4">
         <MetricCard
           label="OLT Online"
           value={`${onlineOltCount}/${olts.length}`}
@@ -155,8 +155,8 @@ export function OltsView() {
       </div>
 
       <Card>
-        <CardContent className="flex flex-wrap items-center gap-3 p-4">
-          <div className="relative min-w-[220px] flex-1">
+        <CardContent className="flex flex-col gap-2.5 p-3.5 sm:flex-row sm:items-center sm:p-4">
+          <div className="relative w-full flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               className="pl-9 pr-8"
@@ -176,24 +176,26 @@ export function OltsView() {
             )}
           </div>
 
-          <Select value={vendorFilter} onValueChange={setVendorFilter}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Semua Vendor" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Semua Vendor</SelectItem>
-              {vendorOptions.map((v) => (
-                <SelectItem key={v} value={v}>
-                  {v}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+            <Select value={vendorFilter} onValueChange={setVendorFilter}>
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectValue placeholder="Semua Vendor" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Semua Vendor</SelectItem>
+                {vendorOptions.map((v) => (
+                  <SelectItem key={v} value={v}>
+                    {v}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-          <Button onClick={openAddDialog} className="ml-auto">
-            <Plus className="h-4 w-4" />
-            Tambah OLT
-          </Button>
+            <Button onClick={openAddDialog} className="w-full sm:w-auto">
+              <Plus className="h-4 w-4" />
+              Tambah OLT
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -224,7 +226,7 @@ export function OltsView() {
             const isPolling = pollingOltId === olt.id
             return (
               <Card key={olt.id} className="transition-shadow hover:shadow-md">
-                <CardContent className="flex flex-col justify-between gap-4 p-5 lg:flex-row lg:items-center">
+                <CardContent className="flex flex-col justify-between gap-3.5 p-4 sm:gap-4 sm:p-5 lg:flex-row lg:items-center">
                   <div className="min-w-0 space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-base font-bold tracking-tight">{olt.name}</span>
@@ -255,8 +257,8 @@ export function OltsView() {
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button size="sm" disabled={isPolling} onClick={() => void pollOnu(olt)}>
+                  <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+                    <Button size="sm" className="col-span-2 sm:col-span-1" disabled={isPolling} onClick={() => void pollOnu(olt)}>
                       <RefreshCcw className={cn("h-3.5 w-3.5", isPolling && "animate-spin")} />
                       {isPolling ? "Polling..." : "Poll ONU"}
                     </Button>
@@ -282,13 +284,14 @@ export function OltsView() {
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
-                          size="icon"
+                          size="sm"
                           variant="destructive"
-                          className="h-8 w-8"
+                          className="w-full sm:size-8 sm:px-0"
                           onClick={() => setDeleteTarget(olt)}
                           aria-label={`Hapus ${olt.name}`}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
+                          <span className="sm:hidden">Hapus</span>
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>Hapus OLT</TooltipContent>

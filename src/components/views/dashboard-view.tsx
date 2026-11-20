@@ -51,30 +51,31 @@ export function DashboardView() {
   if (loading) {
     return (
       <div className="space-y-4">
-        <Card className="p-5">
+        <Card className="p-4 sm:p-5">
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
             <div className="space-y-2">
               <Skeleton className="h-5 w-44 rounded-full" />
-              <Skeleton className="h-7 w-72" />
-              <Skeleton className="h-4 w-56" />
+              <Skeleton className="h-7 w-64 sm:w-72" />
+              <Skeleton className="h-4 w-52 sm:w-56" />
             </div>
-            <div className="flex gap-2">
-              <Skeleton className="h-9 w-32" />
-              <Skeleton className="h-9 w-28" />
+            <div className="grid grid-cols-2 gap-2 sm:flex">
+              <Skeleton className="col-span-2 h-9 w-full sm:col-span-1 sm:w-32" />
+              <Skeleton className="h-9 w-full sm:w-28" />
+              <Skeleton className="h-9 w-full sm:w-24" />
             </div>
           </div>
         </Card>
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-4 xl:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <Card key={i} className="p-5">
-              <div className="flex items-center gap-2.5">
-                <Skeleton className="h-10 w-10 rounded-xl" />
-                <Skeleton className="h-4 w-24" />
+            <Card key={i} className="p-3.5 sm:p-5">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-8 w-8 rounded-xl sm:h-10 sm:w-10" />
+                <Skeleton className="h-4 w-20 sm:w-24" />
               </div>
-              <Skeleton className="mt-4 h-8 w-20" />
+              <Skeleton className="mt-3 h-7 w-16 sm:mt-4 sm:h-8 sm:w-20" />
               <Skeleton className="mt-3 h-1.5 w-full" />
-              <Skeleton className="mt-3 h-3 w-40" />
+              <Skeleton className="mt-2.5 h-3 w-full sm:w-40" />
             </Card>
           ))}
         </div>
@@ -151,7 +152,7 @@ export function DashboardView() {
     <div className="space-y-4">
       <Card className="relative overflow-hidden bg-gradient-to-r from-card via-card to-primary/[0.07]">
         <div className="bg-dot-grid pointer-events-none absolute inset-y-0 right-0 w-72 opacity-40 [mask-image:radial-gradient(ellipse_at_top_right,black,transparent_75%)]" />
-        <CardContent className="relative flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center">
+        <CardContent className="relative flex flex-col justify-between gap-4 p-4 sm:flex-row sm:items-center sm:p-5">
           <div className="space-y-1.5">
             <div className="inline-flex items-center gap-2 rounded-full border border-border/80 bg-background/80 px-3 py-1 text-xs font-medium backdrop-blur-sm">
               <span className="relative flex h-2 w-2">
@@ -167,13 +168,14 @@ export function DashboardView() {
                 {isHealthy ? "Semua Sistem Normal" : `${openAlertCount} Gangguan Perlu Perhatian`}
               </span>
             </div>
-            <h2 className="cn-font-heading text-xl font-bold tracking-tight sm:text-2xl">Ringkasan Operasional Jaringan</h2>
+            <h2 className="cn-font-heading text-lg font-bold tracking-tight sm:text-2xl">Ringkasan Operasional Jaringan</h2>
             <p className="text-xs text-muted-foreground">{notice}</p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
             <Button
               size="sm"
+              className="col-span-2 sm:col-span-1"
               disabled={olts.length === 0 || Boolean(pollingOltId)}
               onClick={() => olts.forEach((o) => void pollOnu(o))}
             >
@@ -196,7 +198,7 @@ export function DashboardView() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 xl:grid-cols-4">
         <MetricCard
           label="OLT Online"
           value={String(onlineOltCount)}
@@ -246,7 +248,7 @@ export function DashboardView() {
 
       <div className="grid gap-4 xl:grid-cols-12">
         <Card className="xl:col-span-7">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+          <CardHeader className="flex flex-col gap-2 space-y-0 pb-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
               <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-emerald-500/25 bg-gradient-to-br from-emerald-500/15 to-cyan-500/5 text-emerald-600 dark:text-emerald-400">
                 <Activity className="h-[18px] w-[18px]" />
@@ -256,7 +258,7 @@ export function DashboardView() {
                 <CardDescription className="mt-1">Distribusi ketersediaan ONU, kualitas RX, dan suhu perangkat.</CardDescription>
               </div>
             </div>
-            <Button size="sm" variant="ghost" asChild className="shrink-0">
+            <Button size="sm" variant="ghost" asChild className="self-start sm:self-auto shrink-0">
               <Link to="/onus">
                 Detail ONU
                 <ArrowRight className="h-3.5 w-3.5" />
@@ -326,8 +328,8 @@ export function DashboardView() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-xl border border-border/70 bg-muted/20 p-3 transition-colors hover:bg-muted/35">
+                <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+                  <div className="rounded-xl border border-border/70 bg-muted/20 p-2.5 transition-colors hover:bg-muted/35 sm:p-3">
                     <div className="flex items-center justify-between text-xs">
                       <span className="flex items-center gap-1.5 font-medium text-muted-foreground">
                         <span className="h-2 w-2 rounded-full bg-emerald-500" />
@@ -338,7 +340,7 @@ export function DashboardView() {
                     <p className="mt-1 text-[11px] text-muted-foreground">Sinyal RX dalam batas aman</p>
                   </div>
 
-                  <div className="rounded-xl border border-border/70 bg-muted/20 p-3 transition-colors hover:bg-muted/35">
+                  <div className="rounded-xl border border-border/70 bg-muted/20 p-2.5 transition-colors hover:bg-muted/35 sm:p-3">
                     <div className="flex items-center justify-between text-xs">
                       <span className="flex items-center gap-1.5 font-medium text-muted-foreground">
                         <span className="h-2 w-2 rounded-full bg-rose-500" />
@@ -349,7 +351,7 @@ export function DashboardView() {
                     <p className="mt-1 text-[11px] text-muted-foreground">Terdeteksi tidak terhubung</p>
                   </div>
 
-                  <div className="rounded-xl border border-border/70 bg-muted/20 p-3 transition-colors hover:bg-muted/35">
+                  <div className="rounded-xl border border-border/70 bg-muted/20 p-2.5 transition-colors hover:bg-muted/35 sm:p-3">
                     <div className="flex items-center justify-between text-xs">
                       <span className="flex items-center gap-1.5 font-medium text-muted-foreground">
                         <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
@@ -362,7 +364,7 @@ export function DashboardView() {
                     <p className="mt-1 text-[11px] text-muted-foreground">Ambang &le; -27 dBm</p>
                   </div>
 
-                  <div className="rounded-xl border border-border/70 bg-muted/20 p-3 transition-colors hover:bg-muted/35">
+                  <div className="rounded-xl border border-border/70 bg-muted/20 p-2.5 transition-colors hover:bg-muted/35 sm:p-3">
                     <div className="flex items-center justify-between text-xs">
                       <span className="flex items-center gap-1.5 font-medium text-muted-foreground">
                         <Thermometer className="h-3.5 w-3.5 text-rose-500" />
@@ -432,13 +434,13 @@ export function DashboardView() {
 
       <div className="grid gap-4 xl:grid-cols-[1fr_400px]">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+          <CardHeader className="flex flex-col gap-2 space-y-0 pb-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
               <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-cyan-500/25 bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
                 <Network className="h-4 w-4" />
               </div>
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <CardTitle>Status Perangkat OLT</CardTitle>
                   <Badge variant="outline" className="tabular-nums text-[11px]">
                     {onlineOltCount}/{olts.length} Online
@@ -447,7 +449,7 @@ export function DashboardView() {
                 <CardDescription className="mt-1">Daftar OLT terdaftar dan hasil polling terbaru.</CardDescription>
               </div>
             </div>
-            <Button size="sm" variant="ghost" asChild>
+            <Button size="sm" variant="ghost" asChild className="self-start sm:self-auto">
               <Link to="/olts">
                 Kelola OLT
                 <ArrowRight className="h-3.5 w-3.5" />
@@ -457,7 +459,7 @@ export function DashboardView() {
 
           <CardContent>
             {olts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center rounded-xl border border-dashed p-10 text-center">
+              <div className="flex flex-col items-center justify-center rounded-xl border border-dashed p-8 text-center sm:p-10">
                 <div className="grid h-12 w-12 place-items-center rounded-2xl bg-primary/10 text-primary shadow-sm ring-4 ring-primary/5">
                   <Network className="h-6 w-6" />
                 </div>
@@ -470,8 +472,44 @@ export function DashboardView() {
                 </Button>
               </div>
             ) : (
-              <div className="overflow-hidden rounded-xl border">
-                <Table>
+              <>
+                <div className="space-y-2.5 md:hidden">
+                  {olts.map((olt) => (
+                    <div key={olt.id} className="rounded-xl border bg-muted/15 p-3.5 space-y-2.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold">{olt.name}</p>
+                          <p className="truncate text-[11px] text-muted-foreground">
+                            {olt.model && olt.model !== "-" ? olt.model : olt.lastSeen}
+                          </p>
+                        </div>
+                        <StatusBadge value={olt.status} className="shrink-0" />
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                        <Badge variant="outline">{olt.vendor}</Badge>
+                        <span className="rounded-md bg-muted/60 px-2 py-0.5 font-mono text-foreground/90">
+                          {olt.ipAddress}:{olt.snmpPort}
+                        </span>
+                        <Badge variant="secondary" className="tabular-nums">
+                          {olt.activeOnu} ONU Aktif
+                        </Badge>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full"
+                        disabled={pollingOltId === olt.id}
+                        onClick={() => void pollOnu(olt)}
+                      >
+                        <RefreshCcw className={cn("h-3.5 w-3.5", pollingOltId === olt.id && "animate-spin text-primary")} />
+                        {pollingOltId === olt.id ? "Polling..." : "Poll ONU"}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="hidden overflow-hidden rounded-xl border md:block">
+                  <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Nama OLT</TableHead>
@@ -528,14 +566,15 @@ export function DashboardView() {
                     ))}
                   </TableBody>
                 </Table>
-              </div>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
 
         <Card className="flex flex-col">
           <CardHeader className="space-y-3 pb-3">
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-3">
                 <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-rose-500/25 bg-rose-500/10 text-rose-600 dark:text-rose-400">
                   <Bell className="h-4 w-4" />
@@ -574,7 +613,7 @@ export function DashboardView() {
 
           <CardContent className="flex-1">
             {visibleAlerts.length === 0 ? (
-              <div className="flex h-[330px] flex-col items-center justify-center rounded-xl border border-dashed p-6 text-center">
+              <div className="flex h-[280px] flex-col items-center justify-center rounded-xl border border-dashed p-6 text-center sm:h-[330px]">
                 <CheckCircle2 className="h-8 w-8 text-emerald-500/75" />
                 <p className="mt-2 text-sm font-medium">
                   {alertTab === "open" ? "Tidak ada alert terbuka" : "Semua perangkat normal"}
@@ -582,7 +621,7 @@ export function DashboardView() {
                 <p className="mt-1 text-xs text-muted-foreground">Tidak ada alert gangguan yang perlu ditindaklanjuti.</p>
               </div>
             ) : (
-              <ScrollArea className="h-[330px] pr-3">
+              <ScrollArea className="h-[290px] pr-3 sm:h-[330px]">
                 <div className="space-y-2.5">
                   {visibleAlerts.map((alert) => (
                     <div

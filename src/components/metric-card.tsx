@@ -61,39 +61,39 @@ export function MetricCard({
   const style = tones[tone]
 
   const inner = (
-    <CardContent className="relative flex h-full flex-col justify-between p-5">
+    <CardContent className="relative flex h-full flex-col justify-between p-3.5 sm:p-5">
       <div className="flex items-start justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2.5">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-2.5">
           {Icon && (
-            <div className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-xl border shadow-sm", style.iconWrap)}>
-              <Icon className="h-[18px] w-[18px]" />
+            <div className={cn("grid h-8 w-8 shrink-0 place-items-center rounded-xl border shadow-sm sm:h-10 sm:w-10", style.iconWrap)}>
+              <Icon className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
             </div>
           )}
-          <p className="truncate text-xs font-semibold tracking-wide text-muted-foreground">{label}</p>
+          <p className="truncate text-[11px] font-semibold tracking-wide text-muted-foreground sm:text-xs">{label}</p>
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
           {badge && (
-            <Badge variant={badgeVariant} className="px-2 py-0.5 text-[11px] font-semibold tabular-nums">
+            <Badge variant={badgeVariant} className="px-1.5 py-0.5 text-[10px] font-semibold tabular-nums sm:px-2 sm:text-[11px]">
               {badge}
             </Badge>
           )}
           {href && (
-            <ArrowUpRight className="h-4 w-4 text-muted-foreground/70 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-foreground" />
+            <ArrowUpRight className="hidden h-4 w-4 text-muted-foreground/70 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-foreground sm:block" />
           )}
         </div>
       </div>
 
-      <div className="mt-4 flex items-baseline gap-1.5">
-        <span className="cn-font-heading text-3xl font-bold tracking-tight tabular-nums">{value}</span>
-        {subValue && <span className="text-base font-semibold text-muted-foreground tabular-nums">{subValue}</span>}
+      <div className="mt-3 flex items-baseline gap-1 sm:mt-4 sm:gap-1.5">
+        <span className="cn-font-heading text-2xl font-bold tracking-tight tabular-nums sm:text-3xl">{value}</span>
+        {subValue && <span className="text-sm font-semibold text-muted-foreground tabular-nums sm:text-base">{subValue}</span>}
       </div>
 
-      <div className="mt-3 space-y-2.5">
+      <div className="mt-2.5 space-y-2 sm:mt-3 sm:space-y-2.5">
         {progress !== undefined && (
           <Progress value={progress} className="h-1.5 bg-secondary/80" indicatorClassName={style.indicator} />
         )}
-        <p className="truncate border-t border-border/50 pt-2.5 text-xs text-muted-foreground">{detail}</p>
+        <p className="truncate border-t border-border/50 pt-2 text-[11px] text-muted-foreground sm:pt-2.5 sm:text-xs">{detail}</p>
       </div>
     </CardContent>
   )

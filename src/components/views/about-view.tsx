@@ -24,12 +24,12 @@ export function AboutView() {
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <CardHeader className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
           <div className="flex items-center gap-3.5">
             <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-cyan-400 via-emerald-400 to-sky-500 text-slate-950 shadow-sm">
               <Network className="h-6 w-6" />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <CardTitle className="text-xl">PingLo</CardTitle>
                 <Badge variant="info">v1.1.0</Badge>
@@ -42,7 +42,7 @@ export function AboutView() {
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-6 p-4 pt-0 sm:p-5 sm:pt-0">
           <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">
             Aplikasi monitoring SNMP OLT &amp; ONU/ONT yang dirancang khusus untuk tim NOC dan teknisi lapangan ISP. Dilengkapi pemetaan titik lokasi perangkat ONU berbasis Leaflet (OpenStreetMap &amp; Satelit), deteksi sinyal lemah, alert otomatis, serta manajemen akses berbasis role dengan penyimpanan SQLite lokal bawaan Node.js.
           </p>
