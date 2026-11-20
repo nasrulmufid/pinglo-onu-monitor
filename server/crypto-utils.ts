@@ -32,7 +32,17 @@ export function initSecretKey(dataDir: string): void {
   }
 
   const rawHex = randomBytes(32).toString("hex")
-  writeFileSync(keyPath, `${rawHex}\n`, { encoding: "utf8", mode: 0o600 })
+  try {
+    writeFileSync(keyPath, `${rawHex}\n`, { encoding: "utf8", mode: 0o600 })
+  } catch (error) {
+    const code = error && typeof error === "object" && "code" in error ? String((error as { code?: unknown }).code) : ""
+    if (code === "EACCES" || code === "EPERM") {
+      throw new Error(
+        `Tidak memiliki izin menulis ke ${keyPath}. Pastikan folder data dimiliki user container (mis. chown -R 1000:1000 ./data) atau set environment variable PINGLO_ENCRYPTION_KEY.`,
+      )
+    }
+    throw error
+  }
   if (process.platform !== "win32") {
     try {
       chmodSync(keyPath, 0o600)
