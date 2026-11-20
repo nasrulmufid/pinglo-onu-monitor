@@ -24,8 +24,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { useAuth } from "@/context/auth-context"
 import { useTheme } from "@/hooks/use-theme"
-import { authStorageKey, type AuthSession } from "@shared/auth-types"
+import { apiFetch } from "@/lib/api"
+import type { AuthSession } from "@shared/auth-types"
 
 const features = [
   {
@@ -48,6 +50,7 @@ const features = [
 export function LoginForm() {
   const navigate = useNavigate()
   const { darkMode, toggleTheme } = useTheme()
+  const { session, authLoading, setSession } = useAuth()
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
@@ -56,8 +59,8 @@ export function LoginForm() {
   const [message, setMessage] = useState("Masuk untuk membuka dashboard monitoring.")
 
   useEffect(() => {
-    if (window.localStorage.getItem(authStorageKey)) navigate("/", { replace: true })
-  }, [navigate])
+    if (!authLoading && session) navigate("/", { replace: true })
+  }, [authLoading, session, navigate])
 
   async function login() {
     if (loading || !username.trim() || !password) return
@@ -65,7 +68,7 @@ export function LoginForm() {
     setHasError(false)
     setMessage("Memeriksa akses...")
     try {
-      const res = await fetch("/api/auth/login", {
+      const res = await apiFetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
@@ -76,8 +79,7 @@ export function LoginForm() {
         setMessage(result.message)
         return
       }
-      window.localStorage.setItem(authStorageKey, JSON.stringify(result.session))
-      window.dispatchEvent(new Event("mikroin-auth-change"))
+      setSession(result.session)
       toast.success("Login berhasil")
       navigate("/", { replace: true })
     } catch {

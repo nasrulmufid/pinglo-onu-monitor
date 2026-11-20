@@ -6,6 +6,7 @@ export type AuthSession = {
   name: string
   role: AppRole
   expiresAt: number
+  mustChangePassword?: boolean
 }
 
 export type PublicUser = {
@@ -34,8 +35,8 @@ export const roleLabels: Record<AppRole, string> = {
 }
 
 export const roleDescriptions: Record<AppRole, string> = {
-  admin: "Bisa mengakses Dashboard, OLT, ONU/ONT, Map ONU, Alert, dan About.",
-  "super-admin": "Bisa mengakses semua menu, termasuk Setting, System, dan Reset Default.",
+  admin: "Bisa mengakses Dashboard, monitoring OLT (poll & test), ONU/ONT (rename & peta), Map ONU, Alert, dan About.",
+  "super-admin": "Akses penuh seluruh fitur termasuk tambah/edit/hapus OLT, Setting, Manajemen User, System, dan Reset Database.",
 }
 
 export function canAccessPath(role: AppRole, pathname: string) {

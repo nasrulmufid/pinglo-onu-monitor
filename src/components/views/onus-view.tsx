@@ -182,7 +182,7 @@ export function OnusView() {
 
                 <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => setImportOpen(true)}>
                   <FileSpreadsheet className="h-4 w-4 text-primary" />
-                  Import XLS
+                  Import Excel
                 </Button>
               </div>
 

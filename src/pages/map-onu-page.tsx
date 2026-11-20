@@ -178,7 +178,7 @@ export function MapOnuPage() {
 
               <Button type="button" variant="outline" onClick={() => setImportOpen(true)}>
                 <FileSpreadsheet className="h-4 w-4 text-primary" />
-                Import XLS
+                Import Excel
               </Button>
             </div>
           </div>

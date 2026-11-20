@@ -16,6 +16,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useMonitoring } from "@/context/monitoring-context"
 import {
   downloadOnuLocationTemplate,
+  MAX_SPREADSHEET_BYTES,
   parseOnuLocationSpreadsheet,
   type ParsedLocationRow,
 } from "@/lib/onu-location-excel"
@@ -109,21 +110,29 @@ export function BulkLocationImportDialog({
     onOpenChange(nextOpen)
   }
 
-  function handleDownload(format: "xlsx" | "xls") {
+  async function handleDownload(format: "xlsx" | "csv") {
     if (!selectedOlt) return
     if (oltOnus.length === 0) {
       toast.error(`Belum ada data ONU pada ${selectedOlt.name}. Jalankan Poll ONU terlebih dahulu.`)
       return
     }
-    downloadOnuLocationTemplate(selectedOlt, oltOnus, { format, includeExisting })
-    toast.success(`Template .${format} untuk ${selectedOlt.name} (${oltOnus.length} ONU) berhasil diunduh.`)
+    try {
+      await downloadOnuLocationTemplate(selectedOlt, oltOnus, { format, includeExisting })
+      toast.success(`Template .${format} untuk ${selectedOlt.name} (${oltOnus.length} ONU) berhasil diunduh.`)
+    } catch {
+      toast.error(`Gagal membuat file template .${format}.`)
+    }
   }
 
   function handleFilePicked(file: File | undefined) {
     if (!file) return
+    if (file.size > MAX_SPREADSHEET_BYTES) {
+      toast.error("Ukuran file melebihi batas maksimum 5 MB.")
+      return
+    }
     const lower = file.name.toLowerCase()
-    if (!lower.endsWith(".xls") && !lower.endsWith(".xlsx") && !lower.endsWith(".csv")) {
-      toast.error("Format file harus .xls, .xlsx, atau .csv.")
+    if (!lower.endsWith(".xlsx") && !lower.endsWith(".csv")) {
+      toast.error("Format file harus .xlsx atau .csv.")
       return
     }
     setUploadedFile(file)
@@ -158,10 +167,10 @@ export function BulkLocationImportDialog({
             <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary/10 text-primary">
               <FileSpreadsheet className="h-4 w-4" />
             </span>
-            <span>Import Koordinat ONU Massal (XLS / XLSX)</span>
+            <span>Import Koordinat ONU Massal (XLSX / CSV)</span>
           </DialogTitle>
           <DialogDescription>
-            Unduh template daftar ONU per OLT, isi kolom <b>longitude</b> dan <b>latitude</b> di Excel, lalu unggah kembali untuk memperbarui titik lokasi secara massal.
+            Unduh template daftar ONU per OLT, isi kolom <b>longitude</b> dan <b>latitude</b> di Excel (.xlsx) atau CSV, lalu unggah kembali untuk memperbarui titik lokasi secara massal.
           </DialogDescription>
         </DialogHeader>
 
@@ -200,13 +209,13 @@ export function BulkLocationImportDialog({
                 </div>
 
                 <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center">
-                  <Button type="button" size="sm" variant="secondary" className="w-full sm:w-auto" disabled={!selectedOlt || oltOnus.length === 0} onClick={() => handleDownload("xlsx")}>
+                  <Button type="button" size="sm" variant="secondary" className="w-full sm:w-auto" disabled={!selectedOlt || oltOnus.length === 0} onClick={() => void handleDownload("xlsx")}>
                     <Download className="h-3.5 w-3.5" />
                     Template (.xlsx)
                   </Button>
-                  <Button type="button" size="sm" variant="outline" className="w-full sm:w-auto" disabled={!selectedOlt || oltOnus.length === 0} onClick={() => handleDownload("xls")}>
+                  <Button type="button" size="sm" variant="outline" className="w-full sm:w-auto" disabled={!selectedOlt || oltOnus.length === 0} onClick={() => void handleDownload("csv")}>
                     <Download className="h-3.5 w-3.5" />
-                    Template (.xls)
+                    Template (.csv)
                   </Button>
                 </div>
               </div>
@@ -220,11 +229,11 @@ export function BulkLocationImportDialog({
             </div>
 
             <div className="space-y-2">
-              <Label className="text-xs font-semibold">2. Upload File Excel yang Sudah Diisi</Label>
+              <Label className="text-xs font-semibold">2. Upload File Excel / CSV yang Sudah Diisi</Label>
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".xls,.xlsx,.csv"
+                accept=".xlsx,.csv"
                 className="hidden"
                 onChange={(e) => handleFilePicked(e.target.files?.[0])}
               />
@@ -255,7 +264,7 @@ export function BulkLocationImportDialog({
                     <span className="font-semibold text-primary">Klik untuk memilih file</span> atau seret file ke area ini
                   </div>
                   <p className="text-[11px] text-muted-foreground">
-                    Mendukung <b>.xls</b>, <b>.xlsx</b>, dan <b>.csv</b> dengan kolom <code className="font-mono">nama</code>, <code className="font-mono">SN</code>, <code className="font-mono">longitude</code>, <code className="font-mono">latitude</code>
+                    Mendukung <b>.xlsx</b> dan <b>.csv</b> (maks 5 MB) dengan kolom <code className="font-mono">nama</code>, <code className="font-mono">SN</code>, <code className="font-mono">longitude</code>, <code className="font-mono">latitude</code>
                   </p>
                 </button>
               ) : (

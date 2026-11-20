@@ -27,14 +27,13 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useMonitoring } from "@/context/monitoring-context"
+import { apiFetch } from "@/lib/api"
 import { getInitials } from "@/lib/monitoring-utils"
 import {
-  authStorageKey,
   roleDescriptions,
   roleLabels,
   type AppRole,
   type AuthAuditLog,
-  type AuthSession,
   type PublicUser,
 } from "@shared/auth-types"
 import type { StartupStatus } from "@shared/types"
@@ -56,13 +55,13 @@ export function SystemView() {
   useEffect(() => {
     let active = true
     Promise.all([
-      fetch("/api/auth/users").then((r) => r.json() as Promise<{ users: PublicUser[]; auditLogs: AuthAuditLog[] }>),
-      fetch("/api/system/startup").then((r) => r.json() as Promise<StartupStatus>),
+      apiFetch("/api/auth/users").then((r) => r.json() as Promise<{ users: PublicUser[]; auditLogs: AuthAuditLog[] }>),
+      apiFetch("/api/system/startup").then((r) => r.json() as Promise<StartupStatus>),
     ])
       .then(([authData, startupData]) => {
         if (!active) return
-        setUsers(authData.users)
-        setLogs(authData.auditLogs)
+        setUsers(authData.users ?? [])
+        setLogs(authData.auditLogs ?? [])
         setStartup(startupData)
       })
       .catch(() => {
@@ -76,21 +75,13 @@ export function SystemView() {
     }
   }, [])
 
-  function actor() {
-    try {
-      return (JSON.parse(window.localStorage.getItem(authStorageKey) || "{}") as AuthSession).username || "admin"
-    } catch {
-      return "admin"
-    }
-  }
-
   async function saveUser() {
     setSavingUser(true)
     try {
-      const res = await fetch("/api/auth/users", {
+      const res = await apiFetch("/api/auth/users", {
         method: editingId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, id: editingId ?? "", actor: actor() }),
+        body: JSON.stringify({ ...form, id: editingId ?? "" }),
       })
       const d = (await res.json()) as { ok: boolean; message: string; users?: PublicUser[]; auditLogs?: AuthAuditLog[] }
       if (d.users) setUsers(d.users)
@@ -108,10 +99,10 @@ export function SystemView() {
   }
 
   async function removeUser(u: PublicUser) {
-    const res = await fetch("/api/auth/users", {
+    const res = await apiFetch("/api/auth/users", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: u.id, actor: actor() }),
+      body: JSON.stringify({ id: u.id }),
     })
     const d = (await res.json()) as { ok: boolean; message: string; users?: PublicUser[]; auditLogs?: AuthAuditLog[] }
     if (d.users) setUsers(d.users)
@@ -264,7 +255,7 @@ export function SystemView() {
                     type="password"
                     value={form.password}
                     onChange={(e) => setForm({ ...form, password: e.target.value })}
-                    placeholder={editingId ? "Kosongkan jika tidak diubah" : "Minimal 4 karakter"}
+                    placeholder={editingId ? "Kosongkan jika tidak diubah" : "Minimal 8 karakter"}
                   />
                 </div>
                 <div className="space-y-1.5">

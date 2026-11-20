@@ -3,6 +3,8 @@ import {
   Activity,
   Bell,
   Clock,
+  Eye,
+  EyeOff,
   Info,
   Network,
   Pencil,
@@ -40,6 +42,7 @@ import { Separator } from "@/components/ui/separator"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { useAuth } from "@/context/auth-context"
 import { useMonitoring } from "@/context/monitoring-context"
 import {
   emptyOltForm,
@@ -54,6 +57,7 @@ import { oidProfiles } from "@shared/oid-catalog"
 import type { OidProfileKey, Olt } from "@shared/types"
 
 export function OltsView() {
+  const { isSuperAdmin } = useAuth()
   const {
     state,
     pollingOltId,
@@ -75,10 +79,16 @@ export function OltsView() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingOltId, setEditingOltId] = useState<string | null>(null)
   const [form, setForm] = useState<OltForm>(emptyOltForm)
+  const [showCommunity, setShowCommunity] = useState(false)
   const [saving, setSaving] = useState(false)
 
   const [deleteTarget, setDeleteTarget] = useState<Olt | null>(null)
   const [infoSheetOlt, setInfoSheetOlt] = useState<Olt | null>(null)
+
+  const editingOlt = useMemo(
+    () => (editingOltId ? olts.find((o) => o.id === editingOltId) ?? null : null),
+    [olts, editingOltId],
+  )
 
   const filteredOlts = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -191,10 +201,12 @@ export function OltsView() {
               </SelectContent>
             </Select>
 
-            <Button onClick={openAddDialog} className="w-full sm:w-auto">
-              <Plus className="h-4 w-4" />
-              Tambah OLT
-            </Button>
+            {isSuperAdmin && (
+              <Button onClick={openAddDialog} className="w-full sm:w-auto">
+                <Plus className="h-4 w-4" />
+                Tambah OLT
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -211,7 +223,7 @@ export function OltsView() {
                 ? "Tambahkan perangkat OLT pertama Anda untuk memulai koneksi SNMP dan polling ONU."
                 : "Coba ubah kata kunci pencarian atau pilih filter vendor lain."}
             </p>
-            {olts.length === 0 && (
+            {olts.length === 0 && isSuperAdmin && (
               <Button className="mt-4" onClick={openAddDialog}>
                 <Plus className="h-4 w-4" />
                 Tambah OLT Baru
@@ -266,7 +278,7 @@ export function OltsView() {
                       <Wifi className="h-3.5 w-3.5" />
                       Test
                     </Button>
-                    {olt.oidProfile === "hsgq-gpon" && olt.writeMode === "snmp" && (
+                    {isSuperAdmin && olt.oidProfile === "hsgq-gpon" && olt.writeMode === "snmp" && (
                       <Button size="sm" variant="outline" onClick={() => void testWrite(olt)}>
                         Test Write
                       </Button>
@@ -277,25 +289,29 @@ export function OltsView() {
                         Info SNMP
                       </Button>
                     )}
-                    <Button size="sm" variant="outline" onClick={() => openEditDialog(olt)}>
-                      <Pencil className="h-3.5 w-3.5" />
-                      Edit
-                    </Button>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          className="w-full sm:size-8 sm:px-0"
-                          onClick={() => setDeleteTarget(olt)}
-                          aria-label={`Hapus ${olt.name}`}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                          <span className="sm:hidden">Hapus</span>
+                    {isSuperAdmin && (
+                      <>
+                        <Button size="sm" variant="outline" onClick={() => openEditDialog(olt)}>
+                          <Pencil className="h-3.5 w-3.5" />
+                          Edit
                         </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Hapus OLT</TooltipContent>
-                    </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              className="w-full sm:size-8 sm:px-0"
+                              onClick={() => setDeleteTarget(olt)}
+                              aria-label={`Hapus ${olt.name}`}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              <span className="sm:hidden">Hapus</span>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Hapus OLT</TooltipContent>
+                        </Tooltip>
+                      </>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -311,6 +327,7 @@ export function OltsView() {
           if (!open) {
             setEditingOltId(null)
             setForm(emptyOltForm)
+            setShowCommunity(false)
           }
         }}
       >
@@ -433,19 +450,39 @@ export function OltsView() {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="olt-read">Read Community</Label>
-                <Input
-                  id="olt-read"
-                  value={form.readCommunity}
-                  onChange={(e) => setForm({ ...form, readCommunity: e.target.value })}
-                />
+                <div className="relative">
+                  <Input
+                    id="olt-read"
+                    type={showCommunity ? "text" : "password"}
+                    className="pr-10"
+                    value={form.readCommunity}
+                    onChange={(e) => setForm({ ...form, readCommunity: e.target.value })}
+                    placeholder={
+                      editingOlt?.hasReadCommunity ? "Tersimpan — kosongkan jika tidak diubah" : "public"
+                    }
+                  />
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 text-muted-foreground"
+                    onClick={() => setShowCommunity((prev) => !prev)}
+                    aria-label={showCommunity ? "Sembunyikan community" : "Tampilkan community"}
+                  >
+                    {showCommunity ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                  </Button>
+                </div>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="olt-write">Write Community (opsional)</Label>
                 <Input
                   id="olt-write"
+                  type={showCommunity ? "text" : "password"}
                   value={form.writeCommunity}
                   onChange={(e) => setForm({ ...form, writeCommunity: e.target.value })}
-                  placeholder="private"
+                  placeholder={
+                    editingOlt?.hasWriteCommunity ? "Tersimpan — kosongkan jika tidak diubah" : "private"
+                  }
                 />
               </div>
             </div>

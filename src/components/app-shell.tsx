@@ -1,11 +1,14 @@
-import { Fragment, useEffect, useMemo, useState, useSyncExternalStore } from "react"
+import { Fragment, useEffect, useMemo, useState } from "react"
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom"
 import {
   Activity,
   Bell,
   ChevronDown,
+  Eye,
+  EyeOff,
   Gauge,
   Info,
+  KeyRound,
   LogOut,
   Map,
   Menu,
@@ -15,9 +18,11 @@ import {
   Shield,
   Sun,
 } from "lucide-react"
+import { toast } from "sonner"
 
 import { OnuLocationDialog } from "@/components/onu-location-dialog"
 import { OnuViewLocationDialog } from "@/components/onu-view-location-dialog"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -29,6 +34,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,15 +43,18 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { useAuth } from "@/context/auth-context"
 import { useMonitoring } from "@/context/monitoring-context"
 import { useTheme } from "@/hooks/use-theme"
 import { getInitials } from "@/lib/monitoring-utils"
 import { cn } from "@/lib/utils"
-import { authStorageKey, canAccessPath, roleDescriptions, roleLabels, type AuthSession } from "@shared/auth-types"
+import { canAccessPath, roleDescriptions, roleLabels } from "@shared/auth-types"
 
 type NavItem = {
   label: string
@@ -76,25 +85,18 @@ const titles: Record<string, { title: string; subtitle: string; group: string }>
   "/about": { title: "About", subtitle: "Tentang PingLo", group: "Informasi" },
 }
 
-function getAuthSnapshot() {
-  return window.localStorage.getItem(authStorageKey) ?? ""
-}
-
-function subscribeAuth(cb: () => void) {
-  window.addEventListener("storage", cb)
-  window.addEventListener("mikroin-auth-change", cb)
-  return () => {
-    window.removeEventListener("storage", cb)
-    window.removeEventListener("mikroin-auth-change", cb)
-  }
-}
-
 export function AppShell({ children }: { children?: React.ReactNode }) {
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const { darkMode, toggleTheme } = useTheme()
-  const authSnapshot = useSyncExternalStore(subscribeAuth, getAuthSnapshot, () => "")
+  const { session, authLoading, logout, changePassword } = useAuth()
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false)
+  const [currentPassword, setCurrentPassword] = useState("")
+  const [newPassword, setNewPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [showPasswords, setShowPasswords] = useState(false)
+  const [changingPassword, setChangingPassword] = useState(false)
 
   const {
     state,
@@ -120,37 +122,54 @@ export function AppShell({ children }: { children?: React.ReactNode }) {
     [state.onus, activeViewOnu?.id],
   )
 
-  const session = useMemo(() => {
-    if (!authSnapshot) return null
-    try {
-      return JSON.parse(authSnapshot) as AuthSession
-    } catch {
-      return null
-    }
-  }, [authSnapshot])
-
   useEffect(() => {
     setMobileNavOpen(false)
   }, [pathname])
 
   useEffect(() => {
-    if (!authSnapshot || !session || !session.expiresAt || Date.now() > session.expiresAt) {
-      if (authSnapshot) window.localStorage.removeItem(authStorageKey)
+    if (authLoading) return
+    if (!session || !session.expiresAt || Date.now() > session.expiresAt) {
       navigate("/login", { replace: true })
       return
     }
     if (!canAccessPath(session.role, pathname)) {
       navigate("/", { replace: true })
     }
-  }, [authSnapshot, pathname, navigate, session])
+  }, [authLoading, pathname, navigate, session])
 
-  function logout() {
-    window.localStorage.removeItem(authStorageKey)
-    window.dispatchEvent(new Event("mikroin-auth-change"))
+  async function handleLogout() {
+    await logout()
     navigate("/login", { replace: true })
   }
 
-  if (!session) {
+  async function handleChangePassword() {
+    if (changingPassword) return
+    if (!currentPassword || newPassword.length < 8) {
+      toast.error("Password baru minimal 8 karakter.")
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("Konfirmasi password baru tidak cocok.")
+      return
+    }
+    setChangingPassword(true)
+    try {
+      const res = await changePassword(currentPassword, newPassword)
+      if (!res.ok) {
+        toast.error(res.message)
+        return
+      }
+      toast.success(res.message)
+      setPasswordDialogOpen(false)
+      setCurrentPassword("")
+      setNewPassword("")
+      setConfirmPassword("")
+    } finally {
+      setChangingPassword(false)
+    }
+  }
+
+  if (authLoading || !session) {
     return <div className="grid min-h-screen place-items-center text-sm text-muted-foreground">Memeriksa akses...</div>
   }
 
@@ -335,13 +354,17 @@ export function AppShell({ children }: { children?: React.ReactNode }) {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setPasswordDialogOpen(true)}>
+                  <KeyRound className="h-4 w-4" />
+                  <span>Ganti Password</span>
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={toggleTheme}>
                   {darkMode ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4" />}
                   <span>{darkMode ? "Beralih ke Mode Terang" : "Beralih ke Mode Gelap"}</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onClick={logout}
+                  onClick={() => void handleLogout()}
                   className="text-destructive focus:bg-destructive/10 focus:text-destructive"
                 >
                   <LogOut className="h-4 w-4" />
@@ -413,6 +436,128 @@ export function AppShell({ children }: { children?: React.ReactNode }) {
           setLocationDialogOnu(target)
         }}
       />
+
+      <Dialog
+        open={Boolean(session.mustChangePassword) || passwordDialogOpen}
+        onOpenChange={(open) => {
+          if (session.mustChangePassword) return
+          setPasswordDialogOpen(open)
+          if (!open) {
+            setCurrentPassword("")
+            setNewPassword("")
+            setConfirmPassword("")
+          }
+        }}
+      >
+        <DialogContent
+          className="max-w-md"
+          onEscapeKeyDown={(e) => {
+            if (session.mustChangePassword) e.preventDefault()
+          }}
+          onPointerDownOutside={(e) => {
+            if (session.mustChangePassword) e.preventDefault()
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 pr-8">
+              <span className="grid h-7 w-7 place-items-center rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                <KeyRound className="h-4 w-4" />
+              </span>
+              <span>{session.mustChangePassword ? "Wajib Ganti Password Default" : "Ganti Password Akun"}</span>
+            </DialogTitle>
+            <DialogDescription>
+              {session.mustChangePassword
+                ? "Akun ini masih menggunakan password bawaan. Demi keamanan jaringan NOC, perbarui password Anda sebelum melanjutkan."
+                : `Perbarui password login untuk @${session.username}.`}
+            </DialogDescription>
+          </DialogHeader>
+
+          {session.mustChangePassword && (
+            <Alert variant="warning">
+              <KeyRound className="h-4 w-4" />
+              <AlertTitle className="text-xs">Kredensial Default Terdeteksi</AlertTitle>
+              <AlertDescription>Gunakan password minimal 8 karakter yang sulit ditebak.</AlertDescription>
+            </Alert>
+          )}
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              void handleChangePassword()
+            }}
+            className="space-y-3"
+          >
+            <div className="space-y-1.5">
+              <Label htmlFor="cp-current">Password Saat Ini</Label>
+              <div className="relative">
+                <Input
+                  id="cp-current"
+                  type={showPasswords ? "text" : "password"}
+                  className="pr-10"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  autoComplete="current-password"
+                  placeholder="Masukkan password saat ini"
+                />
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 text-muted-foreground"
+                  onClick={() => setShowPasswords((prev) => !prev)}
+                  aria-label={showPasswords ? "Sembunyikan password" : "Tampilkan password"}
+                >
+                  {showPasswords ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="cp-new">Password Baru</Label>
+              <Input
+                id="cp-new"
+                type={showPasswords ? "text" : "password"}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                autoComplete="new-password"
+                placeholder="Minimal 8 karakter"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="cp-confirm">Konfirmasi Password Baru</Label>
+              <Input
+                id="cp-confirm"
+                type={showPasswords ? "text" : "password"}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                autoComplete="new-password"
+                placeholder="Ulangi password baru"
+              />
+            </div>
+
+            <DialogFooter className="pt-2">
+              {session.mustChangePassword ? (
+                <Button type="button" variant="outline" onClick={() => void handleLogout()}>
+                  <LogOut className="h-4 w-4" />
+                  Keluar
+                </Button>
+              ) : (
+                <Button type="button" variant="outline" onClick={() => setPasswordDialogOpen(false)}>
+                  Batal
+                </Button>
+              )}
+              <Button
+                type="submit"
+                disabled={changingPassword || !currentPassword || newPassword.length < 8 || newPassword !== confirmPassword}
+              >
+                <KeyRound className="h-4 w-4" />
+                {changingPassword ? "Menyimpan..." : "Simpan Password"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

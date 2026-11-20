@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useAuth } from "@/context/auth-context"
 import { useMonitoring } from "@/context/monitoring-context"
 import { parseAlertDetail } from "@/lib/monitoring-utils"
 import { cn } from "@/lib/utils"
@@ -25,6 +26,7 @@ import { cn } from "@/lib/utils"
 type AlertTab = "all" | "open" | "critical" | "warning" | "acknowledged"
 
 export function AlertsView() {
+  const { isSuperAdmin } = useAuth()
   const { operationalAlerts, clearAlerts } = useMonitoring()
   const [tab, setTab] = useState<AlertTab>("all")
   const [query, setQuery] = useState("")
@@ -138,36 +140,38 @@ export function AlertsView() {
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+              <div className={cn("gap-2 sm:flex sm:items-center", isSuperAdmin ? "grid grid-cols-2" : "flex")}>
                 <Button size="sm" variant="outline" className="w-full sm:w-auto" onClick={() => void clearAlerts("acknowledged")}>
                   Bersihkan Selesai
                 </Button>
 
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button size="sm" variant="destructive" className="w-full sm:w-auto">
-                      <Trash2 className="h-3.5 w-3.5" />
-                      Bersihkan Semua
-                    </Button>
-                  </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Bersihkan seluruh riwayat alert?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Seluruh riwayat alert yang tersimpan di database SQLite akan dikosongkan. Alert aktif dari perangkat yang masih down akan tetap muncul sampai perangkat kembali online.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Batal</AlertDialogCancel>
-                    <AlertDialogAction
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      onClick={() => void clearAlerts("all")}
-                    >
-                      Ya, Bersihkan Semua
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                {isSuperAdmin && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button size="sm" variant="destructive" className="w-full sm:w-auto">
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Bersihkan Semua
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Bersihkan seluruh riwayat alert?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Seluruh riwayat alert yang tersimpan di database SQLite akan dikosongkan. Alert aktif dari perangkat yang masih down akan tetap muncul sampai perangkat kembali online.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Batal</AlertDialogCancel>
+                        <AlertDialogAction
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          onClick={() => void clearAlerts("all")}
+                        >
+                          Ya, Bersihkan Semua
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
               </div>
             </div>
           </div>

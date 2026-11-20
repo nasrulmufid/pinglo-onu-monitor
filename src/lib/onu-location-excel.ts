@@ -1,6 +1,10 @@
-import * as XLSX from "xlsx"
+import { readSheet } from "read-excel-file/browser"
+import writeXlsxFile, { type SheetData } from "write-excel-file/browser"
 
 import type { Olt, Onu } from "@shared/types"
+
+export const MAX_SPREADSHEET_BYTES = 5 * 1024 * 1024
+export const MAX_SPREADSHEET_ROWS = 5000
 
 export type ParsedLocationRow = {
   rowNumber: number
@@ -19,34 +23,82 @@ export type ParsedLocationRow = {
 
 const TEMPLATE_HEADERS = ["nama", "SN", "longitude", "latitude", "catatan"]
 
-export function downloadOnuLocationTemplate(
+/** Neutralizes potential spreadsheet formula injection prefixes on string cells. */
+export function sanitizeSpreadsheetCell(value: string): string {
+  const clean = value ?? ""
+  return /^[=+\-@\t\r]/.test(clean) ? `'${clean}` : clean
+}
+
+function escapeCsvCell(value: string): string {
+  if (/[",\r\n;]/.test(value)) {
+    return `"${value.replaceAll('"', '""')}"`
+  }
+  return value
+}
+
+function triggerTextDownload(filename: string, content: string, mimeType: string) {
+  const blob = new Blob([content], { type: mimeType })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement("a")
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+export async function downloadOnuLocationTemplate(
   olt: Olt,
   onus: Onu[],
-  options: { format: "xlsx" | "xls"; includeExisting: boolean },
+  options: { format: "xlsx" | "csv"; includeExisting: boolean },
 ) {
-  const rows = onus.map((onu) => ({
-    nama: onu.name,
-    SN: onu.serialNumber,
-    longitude: options.includeExisting && onu.longitude != null ? onu.longitude : "",
-    latitude: options.includeExisting && onu.latitude != null ? onu.latitude : "",
-    catatan: options.includeExisting && onu.locationNote ? onu.locationNote : "",
-  }))
-
-  const worksheet = XLSX.utils.json_to_sheet(rows, { header: TEMPLATE_HEADERS })
-  worksheet["!cols"] = [{ wch: 28 }, { wch: 22 }, { wch: 16 }, { wch: 16 }, { wch: 28 }]
-
-  const workbook = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Koordinat ONU")
-
   const slug =
     olt.name
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "") || "olt"
 
-  XLSX.writeFile(workbook, `template-koordinat-${slug}.${options.format}`, {
-    bookType: options.format === "xls" ? "biff8" : "xlsx",
-  })
+  if (options.format === "csv") {
+    const lines = [
+      TEMPLATE_HEADERS.join(","),
+      ...onus.map((onu) => {
+        const lng = options.includeExisting && onu.longitude != null ? String(onu.longitude) : ""
+        const lat = options.includeExisting && onu.latitude != null ? String(onu.latitude) : ""
+        const note = options.includeExisting && onu.locationNote ? sanitizeSpreadsheetCell(onu.locationNote) : ""
+        return [
+          escapeCsvCell(sanitizeSpreadsheetCell(onu.name)),
+          escapeCsvCell(sanitizeSpreadsheetCell(onu.serialNumber || "-")),
+          lng,
+          lat,
+          escapeCsvCell(note),
+        ].join(",")
+      }),
+    ]
+    triggerTextDownload(`template-koordinat-${slug}.csv`, `\uFEFF${lines.join("\r\n")}`, "text/csv;charset=utf-8")
+    return
+  }
+
+  const sheetData: SheetData = [
+    TEMPLATE_HEADERS.map((h) => ({ value: h, fontWeight: "bold" as const })),
+    ...onus.map((onu) => {
+      const hasLng = options.includeExisting && onu.longitude != null && Number.isFinite(onu.longitude)
+      const hasLat = options.includeExisting && onu.latitude != null && Number.isFinite(onu.latitude)
+      const note = options.includeExisting && onu.locationNote ? onu.locationNote : ""
+      return [
+        { value: sanitizeSpreadsheetCell(onu.name), type: String },
+        { value: sanitizeSpreadsheetCell(onu.serialNumber || "-"), type: String },
+        hasLng ? { value: onu.longitude!, type: Number } : null,
+        hasLat ? { value: onu.latitude!, type: Number } : null,
+        note ? { value: sanitizeSpreadsheetCell(note), type: String } : null,
+      ]
+    }),
+  ]
+
+  await writeXlsxFile(sheetData, {
+    sheet: "Koordinat ONU",
+    columns: [{ width: 28 }, { width: 22 }, { width: 16 }, { width: 16 }, { width: 28 }],
+  }).toFile(`template-koordinat-${slug}.xlsx`)
 }
 
 export function parseCoordinateValue(raw: unknown): { empty: boolean; value: number | null } {
@@ -70,24 +122,107 @@ function normalizeHeaderKey(key: string) {
 }
 
 function pickField(row: Record<string, unknown>, aliases: string[]): unknown {
-  const normalizedEntries = Object.entries(row).map(([k, v]) => [normalizeHeaderKey(k), v] as const)
   for (const alias of aliases) {
-    const match = normalizedEntries.find(([k]) => k === alias)
-    if (match !== undefined) return match[1]
+    if (alias in row) return row[alias]
   }
   return undefined
 }
 
-export async function parseOnuLocationSpreadsheet(file: File, oltOnus: Onu[]): Promise<ParsedLocationRow[]> {
-  const buffer = await file.arrayBuffer()
-  const workbook = XLSX.read(buffer, { type: "array" })
-  const firstSheetName = workbook.SheetNames[0]
-  if (!firstSheetName) {
-    throw new Error("File spreadsheet kosong atau tidak memiliki worksheet.")
+function detectCsvDelimiter(firstLine: string): "," | ";" {
+  let commaCount = 0
+  let semiCount = 0
+  let inQuotes = false
+  for (let i = 0; i < firstLine.length; i += 1) {
+    const ch = firstLine[i]
+    if (ch === '"') inQuotes = !inQuotes
+    else if (!inQuotes && ch === ",") commaCount += 1
+    else if (!inQuotes && ch === ";") semiCount += 1
+  }
+  return semiCount > commaCount ? ";" : ","
+}
+
+function parseCsvMatrix(rawText: string): string[][] {
+  const text = rawText.replace(/^\uFEFF/, "")
+  const firstBreak = text.search(/\r?\n/)
+  const headerLine = firstBreak === -1 ? text : text.slice(0, firstBreak)
+  const delimiter = detectCsvDelimiter(headerLine)
+
+  const rows: string[][] = []
+  let row: string[] = []
+  let cell = ""
+  let inQuotes = false
+
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i]
+    if (inQuotes) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') {
+          cell += '"'
+          i += 1
+        } else {
+          inQuotes = false
+        }
+      } else {
+        cell += ch
+      }
+      continue
+    }
+
+    if (ch === '"') {
+      inQuotes = true
+    } else if (ch === delimiter) {
+      row.push(cell)
+      cell = ""
+    } else if (ch === "\r" || ch === "\n") {
+      if (ch === "\r" && text[i + 1] === "\n") i += 1
+      row.push(cell)
+      rows.push(row)
+      row = []
+      cell = ""
+      if (rows.length > MAX_SPREADSHEET_ROWS + 1) {
+        throw new Error(`Jumlah baris melebihi batas maksimum ${MAX_SPREADSHEET_ROWS} baris.`)
+      }
+    } else {
+      cell += ch
+    }
   }
 
-  const sheet = workbook.Sheets[firstSheetName]
-  const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" })
+  if (cell.length > 0 || row.length > 0) {
+    row.push(cell)
+    rows.push(row)
+  }
+
+  return rows.filter((r) => r.some((v) => v.trim() !== ""))
+}
+
+export async function parseOnuLocationSpreadsheet(file: File, oltOnus: Onu[]): Promise<ParsedLocationRow[]> {
+  if (file.size > MAX_SPREADSHEET_BYTES) {
+    throw new Error("Ukuran file melebihi batas maksimum 5 MB.")
+  }
+
+  const lower = file.name.toLowerCase()
+  if (lower.endsWith(".xls")) {
+    throw new Error("Format .xls lama (Excel 97–2003) tidak didukung. Gunakan format .xlsx atau .csv.")
+  }
+
+  let matrix: unknown[][]
+  if (lower.endsWith(".csv")) {
+    matrix = parseCsvMatrix(await file.text())
+  } else if (lower.endsWith(".xlsx")) {
+    matrix = await readSheet(file)
+  } else {
+    throw new Error("Format file tidak didukung. Gunakan .xlsx atau .csv.")
+  }
+
+  if (matrix.length === 0) {
+    throw new Error("File spreadsheet kosong atau tidak memiliki worksheet.")
+  }
+  if (matrix.length - 1 > MAX_SPREADSHEET_ROWS) {
+    throw new Error(`Jumlah baris data melebihi batas maksimum ${MAX_SPREADSHEET_ROWS} baris.`)
+  }
+
+  const headerKeys = matrix[0].map((cell) => normalizeHeaderKey(String(cell ?? "")))
+  const dataRows = matrix.slice(1).filter((r) => r.some((cell) => cell != null && String(cell).trim() !== ""))
 
   const bySn = new Map<string, Onu>()
   const byName = new Map<string, Onu>()
@@ -98,19 +233,24 @@ export async function parseOnuLocationSpreadsheet(file: File, oltOnus: Onu[]): P
     if (nm) byName.set(nm, onu)
   }
 
-  return rawRows.map((row, index) => {
+  return dataRows.map((cells, index) => {
     const rowNumber = index + 2
-    const nameRaw = pickField(row, ["nama", "name", "namaonu", "namapelanggan", "onu"])
-    const snRaw = pickField(row, ["sn", "serial", "serialnumber", "serialno"])
-    const lngRaw = pickField(row, ["longitude", "lng", "lon", "long"])
-    const latRaw = pickField(row, ["latitude", "lat"])
-    const noteRaw = pickField(row, ["catatan", "note", "locationnote", "keterangan"])
+    const rowObj: Record<string, unknown> = {}
+    headerKeys.forEach((key, colIdx) => {
+      if (key) rowObj[key] = cells[colIdx]
+    })
+
+    const nameRaw = pickField(rowObj, ["nama", "name", "namaonu", "namapelanggan", "onu"])
+    const snRaw = pickField(rowObj, ["sn", "serial", "serialnumber", "serialno"])
+    const lngRaw = pickField(rowObj, ["longitude", "lng", "lon", "long"])
+    const latRaw = pickField(rowObj, ["latitude", "lat"])
+    const noteRaw = pickField(rowObj, ["catatan", "note", "locationnote", "keterangan"])
 
     const name = nameRaw != null ? String(nameRaw).trim() : ""
     const serialNumber = snRaw != null ? String(snRaw).trim() : ""
     const longitudeRaw = lngRaw != null ? String(lngRaw).trim() : ""
     const latitudeRaw = latRaw != null ? String(latRaw).trim() : ""
-    const locationNote = noteRaw !== undefined ? String(noteRaw).trim() : undefined
+    const locationNote = noteRaw !== undefined && noteRaw !== null ? String(noteRaw).trim().slice(0, 300) : undefined
 
     const parsedLng = parseCoordinateValue(lngRaw)
     const parsedLat = parseCoordinateValue(latRaw)

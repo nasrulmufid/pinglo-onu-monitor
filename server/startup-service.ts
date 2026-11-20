@@ -24,8 +24,10 @@ export function getStartupStatus(): StartupStatus {
 
   const service = [
     "[Unit]", "Description=PingLo", "After=network.target", "",
-    "[Service]", "Type=simple", `WorkingDirectory=${projectDir}`, "ExecStart=/usr/bin/npm run start",
-    "Restart=always", "RestartSec=5", "Environment=NODE_ENV=production", `Environment=PORT=${appPort}`, "",
+    "[Service]", "Type=simple", "User=pinglo", `WorkingDirectory=${projectDir}`, "ExecStart=/usr/bin/npm run start",
+    "Restart=always", "RestartSec=5", "NoNewPrivileges=true", "PrivateTmp=true", "ProtectSystem=strict",
+    `ReadWritePaths=${projectDir}/data`,
+    "Environment=NODE_ENV=production", `Environment=PORT=${appPort}`, "",
     "[Install]", "WantedBy=multi-user.target",
   ].join("\n")
 

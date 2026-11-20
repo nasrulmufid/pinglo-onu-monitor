@@ -1,5 +1,98 @@
+import dns from "node:dns/promises"
+import net from "node:net"
+
 import type { Olt, Onu, RenameOnuRequest, RenameOnuResult } from "../shared/types"
 import { getOidProfile } from "../shared/oid-catalog"
+
+function isBlockedIpv4(ip: string, allowLoopback: boolean): string | null {
+  const parts = ip.split(".").map(Number)
+  if (parts.length !== 4 || parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) {
+    return "Format alamat IPv4 tidak valid."
+  }
+  const [a, b] = parts
+  if (a === 0) return "Alamat IP 0.0.0.0/8 tidak diizinkan."
+  if (a === 127 && !allowLoopback) return "Target SNMP loopback (127.0.0.0/8) tidak diizinkan."
+  if (a === 169 && b === 254) return "Target SNMP link-local/metadata (169.254.0.0/16) tidak diizinkan."
+  if (a >= 224) return "Target SNMP multicast/broadcast tidak diizinkan."
+  return null
+}
+
+function isBlockedIp(ip: string): string | null {
+  const allowLoopback = process.env.PINGLO_ALLOW_LOOPBACK_SNMP === "true"
+  const clean = ip.trim().toLowerCase()
+  const mappedV4 = clean.startsWith("::ffff:") ? clean.slice(7) : clean
+
+  if (net.isIPv4(mappedV4)) {
+    return isBlockedIpv4(mappedV4, allowLoopback)
+  }
+
+  if (clean === "::" || clean === "0:0:0:0:0:0:0:0") return "Alamat IPv6 tidak spesifik tidak diizinkan."
+  if ((clean === "::1" || clean === "0:0:0:0:0:0:0:1") && !allowLoopback) {
+    return "Target SNMP loopback IPv6 (::1) tidak diizinkan."
+  }
+  if (/^fe[89ab][0-9a-f]:/i.test(clean)) {
+    return "Target SNMP link-local IPv6 (fe80::/10) tidak diizinkan."
+  }
+  if (clean.startsWith("ff")) {
+    return "Target SNMP multicast IPv6 tidak diizinkan."
+  }
+  if (clean.startsWith("::ffff:")) {
+    // Reject hex-encoded IPv4-mapped IPv6 forms (e.g., ::ffff:7f00:1) to prevent filter bypass.
+    return "Format IPv4-mapped IPv6 tidak diizinkan."
+  }
+  return null
+}
+
+/**
+ * Validates that an SNMP target host and UDP port are well-formed and do not
+ * point to loopback, link-local/cloud metadata, or multicast addresses.
+ */
+export async function validateSnmpTargetHost(
+  rawHost: string,
+  rawPort: number,
+): Promise<{ ok: true; host: string; port: number } | { ok: false; message: string }> {
+  const host = String(rawHost ?? "").trim()
+  const port = Number(rawPort || 161)
+
+  if (!host || host.length > 253) {
+    return { ok: false, message: "IP/Host SNMP wajib diisi (maks 253 karakter)." }
+  }
+  if (/[\s/\\?#@]/.test(host)) {
+    return { ok: false, message: "Format IP/Host SNMP tidak valid." }
+  }
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    return { ok: false, message: "Port SNMP harus bilangan bulat antara 1 dan 65535." }
+  }
+
+  const allowLoopback = process.env.PINGLO_ALLOW_LOOPBACK_SNMP === "true"
+  const lowerHost = host.toLowerCase()
+  if (!allowLoopback && (lowerHost === "localhost" || lowerHost.endsWith(".localhost"))) {
+    return { ok: false, message: "Target SNMP localhost tidak diizinkan." }
+  }
+
+  const ipType = net.isIP(host)
+  if (ipType !== 0) {
+    const blocked = isBlockedIp(host)
+    if (blocked) return { ok: false, message: blocked }
+    return { ok: true, host, port }
+  }
+
+  if (host.includes(":") || !/^[a-zA-Z0-9.-]+$/.test(host)) {
+    return { ok: false, message: "Format hostname SNMP tidak valid." }
+  }
+
+  try {
+    const records = await dns.lookup(host, { all: true })
+    for (const rec of records) {
+      const blocked = isBlockedIp(rec.address)
+      if (blocked) return { ok: false, message: blocked }
+    }
+  } catch {
+    // Hostname failed local DNS lookup; let SNMP timeout/error report reachability naturally.
+  }
+
+  return { ok: true, host, port }
+}
 
 export const baseSystemOids = {
   sysDescr: "1.3.6.1.2.1.1.1.0",
@@ -42,13 +135,21 @@ const vsolGponOids = {
   ifAlias: "1.3.6.1.2.1.31.1.1.1.18",
 }
 
+function sanitizeSnmpText(raw: string): string {
+  return raw
+    .replace(/[\r\n\t]+/g, " ")
+    .replace(/[\x00-\x1F\x7F]/g, "")
+    .trim()
+    .slice(0, 256)
+}
+
 function valueToText(value: unknown) {
   if (Buffer.isBuffer(value)) {
     const text = value.toString("utf8").replace(/\0/g, "").trim()
-    return /^[\x20-\x7E\r\n\t]*$/.test(text) ? text : value.toString("hex").toUpperCase()
+    return /^[\x20-\x7E\r\n\t]*$/.test(text) ? sanitizeSnmpText(text) : value.toString("hex").toUpperCase().slice(0, 256)
   }
   if (value === null || value === undefined) return ""
-  return String(value)
+  return sanitizeSnmpText(String(value))
 }
 
 function oidCompare(a: string, b: string) {
@@ -344,10 +445,13 @@ async function pollVsolOnusFromOlt(snmp: typeof import("net-snmp"), session: Snm
 
 export async function testSnmpConnection(olt: SnmpTestTarget) {
   if (!olt.ipAddress || !olt.readCommunity) return { ok: false, message: "IP dan community SNMP wajib diisi." }
+  const validated = await validateSnmpTargetHost(olt.ipAddress, olt.snmpPort)
+  if (!validated.ok) return { ok: false, message: validated.message }
+
   const snmp = await import("net-snmp")
   const profile = getOidProfile(olt.oidProfile)
   const systemOids = profile.items.filter((i) => i.kind === "system").map((i) => i.oid)
-  const session = createSnmpSession(snmp, olt)
+  const session = createSnmpSession(snmp, { ...olt, ipAddress: validated.host, snmpPort: validated.port })
   try {
     const values = await new Promise<Record<string, string>>((resolve, reject) => {
       session.get(systemOids, (error, varbinds) => {
@@ -367,18 +471,21 @@ export async function testSnmpConnection(olt: SnmpTestTarget) {
 
 export async function pollOnusFromOlt(olt: Olt) {
   if (!olt.ipAddress || !olt.readCommunity) return { ok: false, message: "IP dan community SNMP wajib diisi.", onus: [] as Onu[] }
+  const validated = await validateSnmpTargetHost(olt.ipAddress, olt.snmpPort)
+  if (!validated.ok) return { ok: false, message: validated.message, onus: [] as Onu[] }
   if (olt.oidProfile !== "hsgq-gpon" && olt.oidProfile !== "hsgq-epon" && olt.oidProfile !== "vsol-gpon") {
     return { ok: false, message: `Polling ONU untuk profile ${olt.oidProfile} belum aktif. Aktif: VSOL GPON, HSGQ GPON/EPON.`, onus: [] as Onu[] }
   }
 
+  const targetOlt = { ...olt, ipAddress: validated.host, snmpPort: validated.port }
   const snmp = await import("net-snmp")
-  const session = createSnmpSession(snmp, olt)
+  const session = createSnmpSession(snmp, targetOlt)
   try {
-    if (olt.oidProfile === "vsol-gpon") {
-      const onus = await pollVsolOnusFromOlt(snmp, session, olt)
-      return { ok: true, message: `Polling ONU selesai. Ditemukan ${onus.length} ONU/ONT dari ${olt.name}.`, onus }
+    if (targetOlt.oidProfile === "vsol-gpon") {
+      const onus = await pollVsolOnusFromOlt(snmp, session, targetOlt)
+      return { ok: true, message: `Polling ONU selesai. Ditemukan ${onus.length} ONU/ONT dari ${targetOlt.name}.`, onus }
     }
-    const oids = olt.oidProfile === "hsgq-epon" ? hsgqEponOids : hsgqGponOids
+    const oids = targetOlt.oidProfile === "hsgq-epon" ? hsgqEponOids : hsgqGponOids
     const [ontInfoRows, opticalRows] = await Promise.all([walk(snmp, session, oids.ontInfoBase), walk(snmp, session, oids.opticalBase)])
     const onusByIndex = new Map<string, PartialOnu>()
     assignByColumn(onusByIndex, ontInfoRows, oids.ontName, "name")
@@ -389,8 +496,8 @@ export async function pollOnusFromOlt(olt: Olt) {
     assignOpticalColumn(onusByIndex, opticalRows, oids.txPower, "txPower")
     assignOpticalColumn(onusByIndex, opticalRows, oids.temperature, "temperature")
 
-    const onus = mapHsgqOnus(olt, [...onusByIndex.values()])
-    return { ok: true, message: `Polling ONU selesai. Ditemukan ${onus.length} ONU/ONT dari ${olt.name}.`, onus }
+    const onus = mapHsgqOnus(targetOlt, [...onusByIndex.values()])
+    return { ok: true, message: `Polling ONU selesai. Ditemukan ${onus.length} ONU/ONT dari ${targetOlt.name}.`, onus }
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : "Polling ONU gagal.", onus: [] as Onu[] }
   } finally {
@@ -410,14 +517,18 @@ export async function testOnuRenameWrite(olt: Olt) {
   if (olt.oidProfile === "hsgq-epon") return { ok: false, message: "HSGQ EPON belum mendukung rename via SNMP." }
   if (olt.oidProfile !== "hsgq-gpon" && olt.oidProfile !== "vsol-gpon") return { ok: false, message: `Test Write belum tersedia untuk ${olt.oidProfile}.` }
 
+  const validated = await validateSnmpTargetHost(olt.ipAddress, olt.snmpPort)
+  if (!validated.ok) return { ok: false, message: validated.message }
+  const targetOlt = { ...olt, ipAddress: validated.host, snmpPort: validated.port }
+
   const snmp = await import("net-snmp")
-  const isVsol = olt.oidProfile === "vsol-gpon"
-  const readSession = createSnmpSession(snmp, olt)
+  const isVsol = targetOlt.oidProfile === "vsol-gpon"
+  const readSession = createSnmpSession(snmp, targetOlt)
   try {
     const rows = isVsol ? await walk(snmp, readSession, vsolGponOids.ifAlias, 320) : await walk(snmp, readSession, hsgqGponOids.ontName, 1)
     const target = isVsol ? findVsolAliasTarget(rows) : rows[0]
     if (!target?.oid || !target.value) return { ok: false, message: "Belum ada data nama/alias ONU yang terbaca dari OLT." }
-    const writeSession = createSnmpWriteSession(snmp, olt)
+    const writeSession = createSnmpWriteSession(snmp, targetOlt)
     try {
       await sessionSet(writeSession, snmp.ObjectType.OctetString, target.oid, target.value)
       return {
@@ -451,15 +562,18 @@ export async function renameOnuOnDevice({ olt, onu, nextName }: RenameOnuRequest
     if (olt.oidProfile !== "hsgq-gpon" && olt.oidProfile !== "vsol-gpon") {
       return { ok: false, syncedToDevice: false, message: `SNMP rename belum tersedia untuk ${olt.oidProfile}.` }
     }
+    const validated = await validateSnmpTargetHost(olt.ipAddress, olt.snmpPort)
+    if (!validated.ok) return { ok: false, syncedToDevice: false, message: validated.message }
+    const targetOlt = { ...olt, ipAddress: validated.host, snmpPort: validated.port }
     const snmp = await import("net-snmp")
-    if (olt.oidProfile === "vsol-gpon") {
-      const readSession = createSnmpSession(snmp, olt)
+    if (targetOlt.oidProfile === "vsol-gpon") {
+      const readSession = createSnmpSession(snmp, targetOlt)
       try {
         const ifDescrRows = await walk(snmp, readSession, vsolGponOids.ifDescr, 320)
         const target = findVsolIfDescrTarget(ifDescrRows, onu)
         const targetIndex = (target ? vsolInterfaceIndexFromOid(target.oid, vsolGponOids.ifDescr) : null) || vsolInterfaceIndexFromOnu(onu)
         if (!targetIndex) return { ok: false, syncedToDevice: false, message: "Index ONU VSOL tidak valid." }
-        const writeSession = createSnmpWriteSession(snmp, olt)
+        const writeSession = createSnmpWriteSession(snmp, targetOlt)
         try {
           await sessionSet(writeSession, snmp.ObjectType.OctetString, `${vsolGponOids.ifAlias}.${targetIndex}`, cleanName)
           return { ok: true, syncedToDevice: false, message: `Nama ${onu.serialNumber} disimpan di aplikasi & alias VSOL.` }
@@ -473,9 +587,9 @@ export async function renameOnuOnDevice({ olt, onu, nextName }: RenameOnuRequest
       }
     }
 
-    const deviceIndex = hsgqOntIndexFromOnu(olt, onu)
+    const deviceIndex = hsgqOntIndexFromOnu(targetOlt, onu)
     if (!deviceIndex) return { ok: false, syncedToDevice: false, message: "Index ONU/ONT tidak valid." }
-    const writeSession = createSnmpWriteSession(snmp, olt)
+    const writeSession = createSnmpWriteSession(snmp, targetOlt)
     try {
       await sessionSet(writeSession, snmp.ObjectType.OctetString, `${hsgqGponOids.ontName}.${deviceIndex}`, cleanName)
       return { ok: true, syncedToDevice: true, message: `Nama ${onu.serialNumber} berhasil diubah di aplikasi dan OLT.` }

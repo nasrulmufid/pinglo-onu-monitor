@@ -21,6 +21,8 @@ export type Olt = {
   snmpPort: number
   readCommunity: string
   writeCommunity?: string
+  hasReadCommunity?: boolean
+  hasWriteCommunity?: boolean
   oidProfile: OidProfileKey
   writeMode: "none" | "snmp" | "cli" | "api"
   lastSeen: string

@@ -3,5 +3,6 @@ dist
 data/*.db
 data/*.db-shm
 data/*.db-wal
+data/.master.key
 .env
 .env.local

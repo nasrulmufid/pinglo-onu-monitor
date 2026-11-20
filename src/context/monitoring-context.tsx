@@ -1,6 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 
+import { useAuth } from "@/context/auth-context"
+import { apiFetch } from "@/lib/api"
 import { buildOperationalAlerts, emptyState, type OltForm } from "@/lib/monitoring-utils"
 import type { Alert, BulkOnuLocationItem, BulkOnuLocationResult, MapSettings, MonitoringState, Olt, Onu } from "@shared/types"
 
@@ -38,6 +40,7 @@ type MonitoringContextValue = {
 const MonitoringContext = createContext<MonitoringContextValue | null>(null)
 
 export function MonitoringProvider({ children }: { children: React.ReactNode }) {
+  const { session, authLoading } = useAuth()
   const [state, setState] = useState<MonitoringState>(emptyState)
   const [loading, setLoading] = useState(true)
   const [notice, setNotice] = useState("Memuat database SQLite...")
@@ -54,9 +57,20 @@ export function MonitoringProvider({ children }: { children: React.ReactNode }) 
   }, [state])
 
   useEffect(() => {
+    if (authLoading || !session) {
+      if (!authLoading && !session) {
+        setState(emptyState)
+        setLoading(false)
+      }
+      return
+    }
     let active = true
-    fetch("/api/monitoring/state")
-      .then((r) => r.json() as Promise<MonitoringState>)
+    setLoading(true)
+    apiFetch("/api/monitoring/state")
+      .then(async (r) => {
+        if (!r.ok) throw new Error("Gagal memuat database.")
+        return (await r.json()) as MonitoringState
+      })
       .then((data) => {
         if (!active) return
         setState(data)
@@ -73,22 +87,10 @@ export function MonitoringProvider({ children }: { children: React.ReactNode }) 
     return () => {
       active = false
     }
-  }, [])
-
-  const commitState = useCallback(async (next: MonitoringState) => {
-    setState(next)
-    const res = await fetch("/api/monitoring/state", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(next),
-    })
-    if (!res.ok) throw new Error("Gagal menyimpan ke SQLite.")
-    const saved = (await res.json()) as MonitoringState
-    setState(saved)
-  }, [])
+  }, [authLoading, session])
 
   const saveOnuLocation = useCallback(async (onuId: string, latitude: number, longitude: number, locationNote: string) => {
-    const res = await fetch(`/api/onu/${encodeURIComponent(onuId)}/location`, {
+    const res = await apiFetch(`/api/onu/${encodeURIComponent(onuId)}/location`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ latitude, longitude, locationNote }),
@@ -101,7 +103,7 @@ export function MonitoringProvider({ children }: { children: React.ReactNode }) 
 
   const bulkSaveOnuLocations = useCallback(async (oltId: string, items: BulkOnuLocationItem[]): Promise<BulkOnuLocationResult> => {
     try {
-      const res = await fetch("/api/onus/locations/bulk", {
+      const res = await apiFetch("/api/onus/locations/bulk", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ oltId, items }),
@@ -125,7 +127,7 @@ export function MonitoringProvider({ children }: { children: React.ReactNode }) 
   }, [])
 
   const clearOnuLocation = useCallback(async (onuId: string) => {
-    const res = await fetch(`/api/onu/${encodeURIComponent(onuId)}/location`, { method: "DELETE" })
+    const res = await apiFetch(`/api/onu/${encodeURIComponent(onuId)}/location`, { method: "DELETE" })
     const result = (await res.json()) as { ok: boolean; message: string; state?: MonitoringState }
     if (result.state) setState(result.state)
     if (result.ok) toast.success(result.message)
@@ -133,7 +135,7 @@ export function MonitoringProvider({ children }: { children: React.ReactNode }) 
   }, [])
 
   const saveMapSettings = useCallback(async (nextMap: MapSettings) => {
-    const res = await fetch("/api/settings/map", {
+    const res = await apiFetch("/api/settings/map", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(nextMap),
@@ -144,114 +146,90 @@ export function MonitoringProvider({ children }: { children: React.ReactNode }) 
     else toast.error(result.message)
   }, [])
 
-  const saveOlt = useCallback(
-    async (form: OltForm, editingOltId: string | null) => {
-      const name = form.name.trim()
-      const ipAddress = form.ipAddress.trim()
-      const readCommunity = form.readCommunity.trim()
-      if (!name || !ipAddress || !readCommunity) {
-        toast.error("Nama OLT, IP/Host, dan Read Community wajib diisi.")
-        return false
-      }
-      const payload = {
-        name,
-        ipAddress,
-        vendor: form.vendor,
-        pollingInterval: Number(form.pollingInterval) || 60,
-        snmpPort: Number(form.snmpPort) || 161,
-        readCommunity,
-        writeCommunity: form.writeCommunity.trim(),
-        oidProfile: form.oidProfile,
-        writeMode: form.writeMode,
-      }
-      try {
-        const cur = stateRef.current
-        if (editingOltId) {
-          await commitState({ ...cur, olts: cur.olts.map((o) => (o.id === editingOltId ? { ...o, ...payload } : o)) })
-          toast.success(`${name} berhasil diperbarui.`)
-          return true
-        }
-        const nextOlt: Olt = {
-          id: `olt-${Date.now()}`,
-          ...payload,
-          model: "-",
-          location: "-",
-          status: "offline",
-          uptime: "-",
-          cpuLoad: 0,
-          memoryLoad: 0,
-          ponPorts: 0,
-          activeOnu: 0,
-          snmpVersion: "v2c",
-          lastSeen: "Belum pernah dipolling",
-        }
-        await commitState({ ...cur, olts: [...cur.olts, nextOlt] })
-        toast.success(`${name} ditambahkan ke SQLite.`)
-        return true
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Gagal menyimpan OLT.")
-        return false
-      }
-    },
-    [commitState],
-  )
+  const saveOlt = useCallback(async (form: OltForm, editingOltId: string | null) => {
+    const name = form.name.trim()
+    const ipAddress = form.ipAddress.trim()
+    const readCommunity = form.readCommunity.trim()
+    const existingOlt = editingOltId ? stateRef.current.olts.find((o) => o.id === editingOltId) : null
 
-  const removeOlt = useCallback(
-    async (olt: Olt) => {
-      const cur = stateRef.current
-      await commitState({
-        ...cur,
-        olts: cur.olts.filter((i) => i.id !== olt.id),
-        onus: cur.onus.filter((i) => i.oltId !== olt.id),
-        alerts: cur.alerts.filter((i) => i.oltId !== olt.id),
+    if (!name || !ipAddress) {
+      toast.error("Nama OLT dan IP/Host wajib diisi.")
+      return false
+    }
+    if (!readCommunity && !(editingOltId && existingOlt?.hasReadCommunity)) {
+      toast.error("Read Community wajib diisi.")
+      return false
+    }
+
+    const payload = {
+      name,
+      ipAddress,
+      vendor: form.vendor,
+      pollingInterval: Number(form.pollingInterval) || 60,
+      snmpPort: Number(form.snmpPort) || 161,
+      readCommunity,
+      writeCommunity: form.writeCommunity.trim(),
+      oidProfile: form.oidProfile,
+      writeMode: form.writeMode,
+    }
+
+    try {
+      const url = editingOltId ? `/api/olts/${encodeURIComponent(editingOltId)}` : "/api/olts"
+      const method = editingOltId ? "PUT" : "POST"
+      const res = await apiFetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       })
-      toast.success(`${olt.name} beserta ONU & alert terkait dihapus.`)
-    },
-    [commitState],
-  )
-
-  const testConnection = useCallback(
-    async (olt: Olt) => {
-      toast.info(`Menghubungi ${olt.ipAddress}:${olt.snmpPort}...`)
-      try {
-        const res = await fetch("/api/snmp/test", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(olt),
-        })
-        const result = (await res.json()) as { ok: boolean; message: string; values?: Record<string, string> }
-        const cur = stateRef.current
-        await commitState({
-          ...cur,
-          olts: cur.olts.map((i) =>
-            i.id === olt.id
-              ? {
-                  ...i,
-                  status: result.ok ? "online" : "offline",
-                  lastSeen: result.ok ? "Baru saja" : i.lastSeen,
-                  uptime: result.values?.["1.3.6.1.2.1.1.3.0"] ?? i.uptime,
-                  model: result.values?.["1.3.6.1.4.1.50224.3.1.1.19.0"] || result.values?.["1.3.6.1.4.1.37950.1.1.5.10.14.1.0"] || i.model,
-                  location: result.values?.["1.3.6.1.2.1.1.6.0"] || i.location,
-                  systemInfo: result.values ?? i.systemInfo,
-                }
-              : i,
-          ),
-        })
-        if (result.ok) toast.success(result.message)
-        else toast.error(result.message)
-      } catch {
-        toast.error("Gagal menghubungi endpoint test SNMP.")
+      const result = (await res.json()) as { ok: boolean; message: string; state?: MonitoringState }
+      if (!result.ok) {
+        toast.error(result.message)
+        return false
       }
-    },
-    [commitState],
-  )
+      if (result.state) setState(result.state)
+      toast.success(result.message)
+      return true
+    } catch {
+      toast.error("Gagal menyimpan OLT ke server.")
+      return false
+    }
+  }, [])
+
+  const removeOlt = useCallback(async (olt: Olt) => {
+    try {
+      const res = await apiFetch(`/api/olts/${encodeURIComponent(olt.id)}`, { method: "DELETE" })
+      const result = (await res.json()) as { ok: boolean; message: string; state?: MonitoringState }
+      if (result.state) setState(result.state)
+      if (result.ok) toast.success(result.message)
+      else toast.error(result.message)
+    } catch {
+      toast.error("Gagal menghapus OLT.")
+    }
+  }, [])
+
+  const testConnection = useCallback(async (olt: Olt) => {
+    toast.info(`Menghubungi ${olt.ipAddress}:${olt.snmpPort}...`)
+    try {
+      const res = await apiFetch("/api/snmp/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ oltId: olt.id }),
+      })
+      const result = (await res.json()) as { ok: boolean; message: string; state?: MonitoringState }
+      if (result.state) setState(result.state)
+      if (result.ok) toast.success(result.message)
+      else toast.error(result.message)
+    } catch {
+      toast.error("Gagal menghubungi endpoint test SNMP.")
+    }
+  }, [])
 
   const testWrite = useCallback(async (olt: Olt) => {
     try {
-      const res = await fetch("/api/snmp/test-write", {
+      const res = await apiFetch("/api/snmp/test-write", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(olt),
+        body: JSON.stringify({ oltId: olt.id }),
       })
       const result = (await res.json()) as { ok: boolean; message: string }
       if (result.ok) toast.success(result.message)
@@ -269,10 +247,10 @@ export function MonitoringProvider({ children }: { children: React.ReactNode }) 
       toast.info(`Polling ONU dari ${olt.name}...`)
     }
     try {
-      const res = await fetch("/api/snmp/poll-onu", {
+      const res = await apiFetch("/api/snmp/poll-onu", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(olt),
+        body: JSON.stringify({ oltId: olt.id }),
       })
       const result = (await res.json()) as { ok: boolean; message: string; state?: MonitoringState }
       if (result.state) setState(result.state)
@@ -293,58 +271,52 @@ export function MonitoringProvider({ children }: { children: React.ReactNode }) 
   }, [pollOnu])
 
   useEffect(() => {
-    if (state.olts.length === 0) return
+    if (!session || state.olts.length === 0) return
     const timers = state.olts.map((olt) => {
       const sec = Math.max(10, Number(olt.pollingInterval) || 60)
       return window.setInterval(() => void pollOnuRef.current(olt, { silent: true }), sec * 1000)
     })
     return () => timers.forEach((t) => window.clearInterval(t))
-  }, [state.olts])
+  }, [session, state.olts])
 
-  const saveRename = useCallback(
-    async (onu: Onu, nextName: string) => {
-      const cur = stateRef.current
-      const olt = cur.olts.find((i) => i.id === onu.oltId)
-      if (!olt) return false
-      try {
-        const res = await fetch("/api/onu/rename", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ olt, onu, nextName }),
-        })
-        const result = (await res.json()) as { ok: boolean; syncedToDevice: boolean; message: string }
-        if (!result.ok) {
-          toast.error(result.message)
-          return false
-        }
-        await commitState({
-          ...cur,
-          onus: cur.onus.map((i) =>
-            i.id === onu.id ? { ...i, name: nextName.trim(), syncStatus: result.syncedToDevice ? "synced" : "pending" } : i,
-          ),
-        })
-        toast.success(result.message)
-        return true
-      } catch {
-        toast.error("Gagal menyimpan nama ONU.")
+  const saveRename = useCallback(async (onu: Onu, nextName: string) => {
+    try {
+      const res = await apiFetch("/api/onu/rename", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ oltId: onu.oltId, onuId: onu.id, nextName }),
+      })
+      const result = (await res.json()) as { ok: boolean; message: string; state?: MonitoringState }
+      if (!result.ok) {
+        toast.error(result.message)
         return false
       }
-    },
-    [commitState],
-  )
+      if (result.state) setState(result.state)
+      toast.success(result.message)
+      return true
+    } catch {
+      toast.error("Gagal menyimpan nama ONU.")
+      return false
+    }
+  }, [])
 
-  const clearAlerts = useCallback(
-    async (mode: "acknowledged" | "all") => {
-      const cur = stateRef.current
-      const nextAlerts = mode === "acknowledged" ? cur.alerts.filter((a) => !a.acknowledged) : []
-      await commitState({ ...cur, alerts: nextAlerts })
+  const clearAlerts = useCallback(async (mode: "acknowledged" | "all") => {
+    try {
+      const res = await apiFetch(`/api/alerts?mode=${encodeURIComponent(mode)}`, { method: "DELETE" })
+      const result = (await res.json()) as { ok: boolean; message?: string; state?: MonitoringState }
+      if (!res.ok || !result.ok) {
+        toast.error(result.message ?? "Gagal membersihkan riwayat alert.")
+        return
+      }
+      if (result.state) setState(result.state)
       toast.success("Riwayat alert dibersihkan.")
-    },
-    [commitState],
-  )
+    } catch {
+      toast.error("Gagal membersihkan riwayat alert.")
+    }
+  }, [])
 
   const resetDefault = useCallback(async () => {
-    const res = await fetch("/api/monitoring/state", { method: "DELETE" })
+    const res = await apiFetch("/api/monitoring/state", { method: "DELETE" })
     if (res.ok) {
       setState((await res.json()) as MonitoringState)
       toast.success("Database monitoring dikosongkan.")
