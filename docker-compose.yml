@@ -1,0 +1,13 @@
+services:
+  pinglo:
+    build: .
+    container_name: pinglo
+    restart: unless-stopped
+    ports:
+      - "3007:3007"
+    environment:
+      - NODE_ENV=production
+      - PORT=3007
+      - HOST=0.0.0.0
+    volumes:
+      - ./data:/app/data
