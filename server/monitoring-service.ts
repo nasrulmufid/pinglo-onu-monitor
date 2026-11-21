@@ -186,12 +186,41 @@ export const emptyMonitoringState: MonitoringState = {
   settings: { map: { ...defaultMapSettings } },
 }
 
+function markOltOnusOffline(oltId: string) {
+  db.prepare(
+    `UPDATE onus
+     SET status = 'offline',
+         down_reason = CASE
+           WHEN status = 'online' THEN 'OLT offline'
+           WHEN down_reason IS NULL OR TRIM(down_reason) = '' THEN 'OLT offline'
+           ELSE down_reason
+         END
+     WHERE olt_id = ?`,
+  ).run(oltId)
+}
+
 /** Returns public monitoring state with SNMP community secrets masked. */
 export function readMonitoringState(): MonitoringState {
   const olts = (db.prepare("SELECT * FROM olts ORDER BY rowid ASC").all() as OltRow[]).map((r) => rowToOlt(r, false))
   const onus = (db.prepare("SELECT * FROM onus ORDER BY CAST(pon_port AS INTEGER) ASC, CAST(onu_index AS INTEGER) ASC").all() as OnuRow[]).map(rowToOnu)
   const alerts = (db.prepare("SELECT * FROM alerts ORDER BY sort_order DESC LIMIT 300").all() as AlertRow[]).map(rowToAlert)
-  return { olts, onus, alerts, settings: { map: getMapSettings() } }
+
+  const offlineOltIds = new Set(olts.filter((o) => o.status === "offline").map((o) => o.id))
+  if (offlineOltIds.size === 0) {
+    return { olts, onus, alerts, settings: { map: getMapSettings() } }
+  }
+
+  const normalizedOlts = olts.map((o) => (offlineOltIds.has(o.id) ? { ...o, activeOnu: 0 } : o))
+  const normalizedOnus = onus.map((onu) => {
+    if (!offlineOltIds.has(onu.oltId)) return onu
+    return {
+      ...onu,
+      status: "offline" as const,
+      downReason: onu.status === "online" ? "OLT offline" : onu.downReason || "OLT offline",
+    }
+  })
+
+  return { olts: normalizedOlts, onus: normalizedOnus, alerts, settings: { map: getMapSettings() } }
 }
 
 /** Returns a single OLT record with decrypted SNMP secrets strictly for backend SNMP calls. */
@@ -344,17 +373,23 @@ export function updateOltTestResult(id: string, ok: boolean, values?: Record<str
   const nextLocation = values?.["1.3.6.1.2.1.1.6.0"] || existing.location
   const nextUptime = values?.["1.3.6.1.2.1.1.3.0"] ?? existing.uptime
 
-  db.prepare(
-    `UPDATE olts SET status = ?, last_seen = ?, uptime = ?, model = ?, location = ?, system_info = ? WHERE id = ?`,
-  ).run(
-    ok ? "online" : "offline",
-    ok ? "Baru saja" : existing.last_seen,
-    nextUptime,
-    nextModel,
-    nextLocation,
-    mergedInfo,
-    id,
-  )
+  runTransaction(() => {
+    db.prepare(
+      `UPDATE olts SET status = ?, active_onu = ?, last_seen = ?, uptime = ?, model = ?, location = ?, system_info = ? WHERE id = ?`,
+    ).run(
+      ok ? "online" : "offline",
+      ok ? existing.active_onu : 0,
+      ok ? "Baru saja" : existing.last_seen,
+      nextUptime,
+      nextModel,
+      nextLocation,
+      mergedInfo,
+      id,
+    )
+    if (!ok) {
+      markOltOnusOffline(id)
+    }
+  })
 
   return readMonitoringState()
 }
@@ -380,10 +415,11 @@ export function savePollResultForOlt(input: {
   `)
 
   runTransaction(() => {
-    if (input.activeOnu !== undefined) {
+    const nextActiveOnu = input.status === "offline" ? 0 : input.activeOnu
+    if (nextActiveOnu !== undefined) {
       db.prepare("UPDATE olts SET status = ?, active_onu = ?, last_seen = ? WHERE id = ?").run(
         input.status,
-        input.activeOnu,
+        nextActiveOnu,
         input.lastSeen,
         input.oltId,
       )
@@ -415,6 +451,8 @@ export function savePollResultForOlt(input: {
           onu.locationUpdatedAt ?? null,
         )
       }
+    } else if (input.status === "offline") {
+      markOltOnusOffline(input.oltId)
     }
 
     db.prepare("DELETE FROM alerts").run()

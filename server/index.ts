@@ -158,9 +158,10 @@ function buildTransitionAlerts(state: MonitoringState, olt: Olt, nextOnus: Onu[]
     const prev = previousById.get(onu.id)
     if (!prev) continue
     const wasOnline = prev.status === "online"
+    const wasMarkedOfflineByOlt = !wasOnline && prev.downReason === "OLT offline"
     const isOnline = onu.status === "online"
 
-    if (wasOnline && !isOnline) {
+    if ((wasOnline || wasMarkedOfflineByOlt) && !isOnline) {
       if (latestSavedEvent(state, `onu-${onu.id}`) === "down") continue
       alerts.push({
         id: `onu-${onu.id}-down-${Date.now()}`,
@@ -172,6 +173,7 @@ function buildTransitionAlerts(state: MonitoringState, olt: Olt, nextOnus: Onu[]
         acknowledged: false,
       })
     } else if (!wasOnline && isOnline) {
+      if (wasMarkedOfflineByOlt && latestSavedEvent(state, `onu-${onu.id}`) !== "down") continue
       if (latestSavedEvent(state, `onu-${onu.id}`) === "recovery") continue
       recoveredOnuIds.push(onu.id)
       alerts.push({
@@ -510,6 +512,7 @@ app.post("/api/snmp/poll-onu", requireAuth, snmpLimiter, async (req, res) => {
     const updatedState = savePollResultForOlt({
       oltId: currentOlt.id,
       status: "offline",
+      activeOnu: 0,
       lastSeen: `Gagal: ${new Date().toLocaleString("id-ID")}`,
       nextAlerts,
     })

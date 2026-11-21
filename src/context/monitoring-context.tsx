@@ -3,7 +3,7 @@ import { toast } from "sonner"
 
 import { useAuth } from "@/context/auth-context"
 import { apiFetch } from "@/lib/api"
-import { buildOperationalAlerts, emptyState, type OltForm } from "@/lib/monitoring-utils"
+import { buildOperationalAlerts, emptyState, normalizeMonitoringState, type OltForm } from "@/lib/monitoring-utils"
 import type { Alert, BulkOnuLocationItem, BulkOnuLocationResult, MapSettings, MonitoringState, Olt, Onu } from "@shared/types"
 
 type MonitoringContextValue = {
@@ -52,6 +52,10 @@ export function MonitoringProvider({ children }: { children: React.ReactNode }) 
   const pollingLocksRef = useRef(new Set<string>())
   const pollOnuRef = useRef<(olt: Olt, opts?: { silent?: boolean }) => Promise<void>>(async () => undefined)
 
+  const applyState = useCallback((next: MonitoringState) => {
+    setState(normalizeMonitoringState(next))
+  }, [])
+
   useEffect(() => {
     stateRef.current = state
   }, [state])
@@ -73,7 +77,7 @@ export function MonitoringProvider({ children }: { children: React.ReactNode }) 
       })
       .then((data) => {
         if (!active) return
-        setState(data)
+        applyState(data)
         setNotice(data.olts.length === 0 ? "Database SQLite siap. Tambahkan OLT untuk mulai monitoring." : "Database SQLite berhasil dimuat.")
       })
       .catch(() => {
@@ -87,7 +91,7 @@ export function MonitoringProvider({ children }: { children: React.ReactNode }) 
     return () => {
       active = false
     }
-  }, [authLoading, session])
+  }, [authLoading, session, applyState])
 
   const saveOnuLocation = useCallback(async (onuId: string, latitude: number, longitude: number, locationNote: string) => {
     const res = await apiFetch(`/api/onu/${encodeURIComponent(onuId)}/location`, {
@@ -96,10 +100,10 @@ export function MonitoringProvider({ children }: { children: React.ReactNode }) 
       body: JSON.stringify({ latitude, longitude, locationNote }),
     })
     const result = (await res.json()) as { ok: boolean; message: string; state?: MonitoringState }
-    if (result.state) setState(result.state)
+    if (result.state) applyState(result.state)
     if (result.ok) toast.success(result.message)
     else toast.error(result.message)
-  }, [])
+  }, [applyState])
 
   const bulkSaveOnuLocations = useCallback(async (oltId: string, items: BulkOnuLocationItem[]): Promise<BulkOnuLocationResult> => {
     try {
@@ -109,7 +113,7 @@ export function MonitoringProvider({ children }: { children: React.ReactNode }) 
         body: JSON.stringify({ oltId, items }),
       })
       const result = (await res.json()) as BulkOnuLocationResult
-      if (result.state) setState(result.state)
+      if (result.state) applyState(result.state)
       if (result.ok) toast.success(result.message)
       else toast.error(result.message)
       return result
@@ -124,15 +128,15 @@ export function MonitoringProvider({ children }: { children: React.ReactNode }) 
       toast.error(fail.message)
       return fail
     }
-  }, [])
+  }, [applyState])
 
   const clearOnuLocation = useCallback(async (onuId: string) => {
     const res = await apiFetch(`/api/onu/${encodeURIComponent(onuId)}/location`, { method: "DELETE" })
     const result = (await res.json()) as { ok: boolean; message: string; state?: MonitoringState }
-    if (result.state) setState(result.state)
+    if (result.state) applyState(result.state)
     if (result.ok) toast.success(result.message)
     else toast.error(result.message)
-  }, [])
+  }, [applyState])
 
   const saveMapSettings = useCallback(async (nextMap: MapSettings) => {
     const res = await apiFetch("/api/settings/map", {
@@ -141,10 +145,10 @@ export function MonitoringProvider({ children }: { children: React.ReactNode }) 
       body: JSON.stringify(nextMap),
     })
     const result = (await res.json()) as { ok: boolean; message: string; state?: MonitoringState }
-    if (result.state) setState(result.state)
+    if (result.state) applyState(result.state)
     if (result.ok) toast.success(result.message)
     else toast.error(result.message)
-  }, [])
+  }, [applyState])
 
   const saveOlt = useCallback(async (form: OltForm, editingOltId: string | null) => {
     const name = form.name.trim()
@@ -186,26 +190,26 @@ export function MonitoringProvider({ children }: { children: React.ReactNode }) 
         toast.error(result.message)
         return false
       }
-      if (result.state) setState(result.state)
+      if (result.state) applyState(result.state)
       toast.success(result.message)
       return true
     } catch {
       toast.error("Gagal menyimpan OLT ke server.")
       return false
     }
-  }, [])
+  }, [applyState])
 
   const removeOlt = useCallback(async (olt: Olt) => {
     try {
       const res = await apiFetch(`/api/olts/${encodeURIComponent(olt.id)}`, { method: "DELETE" })
       const result = (await res.json()) as { ok: boolean; message: string; state?: MonitoringState }
-      if (result.state) setState(result.state)
+      if (result.state) applyState(result.state)
       if (result.ok) toast.success(result.message)
       else toast.error(result.message)
     } catch {
       toast.error("Gagal menghapus OLT.")
     }
-  }, [])
+  }, [applyState])
 
   const testConnection = useCallback(async (olt: Olt) => {
     toast.info(`Menghubungi ${olt.ipAddress}:${olt.snmpPort}...`)
@@ -216,13 +220,13 @@ export function MonitoringProvider({ children }: { children: React.ReactNode }) 
         body: JSON.stringify({ oltId: olt.id }),
       })
       const result = (await res.json()) as { ok: boolean; message: string; state?: MonitoringState }
-      if (result.state) setState(result.state)
+      if (result.state) applyState(result.state)
       if (result.ok) toast.success(result.message)
       else toast.error(result.message)
     } catch {
       toast.error("Gagal menghubungi endpoint test SNMP.")
     }
-  }, [])
+  }, [applyState])
 
   const testWrite = useCallback(async (olt: Olt) => {
     try {
@@ -253,7 +257,7 @@ export function MonitoringProvider({ children }: { children: React.ReactNode }) 
         body: JSON.stringify({ oltId: olt.id }),
       })
       const result = (await res.json()) as { ok: boolean; message: string; state?: MonitoringState }
-      if (result.state) setState(result.state)
+      if (result.state) applyState(result.state)
       if (!opts.silent) {
         if (result.ok) toast.success(result.message)
         else toast.error(result.message)
@@ -264,7 +268,7 @@ export function MonitoringProvider({ children }: { children: React.ReactNode }) 
       pollingLocksRef.current.delete(olt.id)
       if (!opts.silent) setPollingOltId(null)
     }
-  }, [])
+  }, [applyState])
 
   useEffect(() => {
     pollOnuRef.current = pollOnu
@@ -291,14 +295,14 @@ export function MonitoringProvider({ children }: { children: React.ReactNode }) 
         toast.error(result.message)
         return false
       }
-      if (result.state) setState(result.state)
+      if (result.state) applyState(result.state)
       toast.success(result.message)
       return true
     } catch {
       toast.error("Gagal menyimpan nama ONU.")
       return false
     }
-  }, [])
+  }, [applyState])
 
   const clearAlerts = useCallback(async (mode: "acknowledged" | "all") => {
     try {
@@ -308,22 +312,22 @@ export function MonitoringProvider({ children }: { children: React.ReactNode }) 
         toast.error(result.message ?? "Gagal membersihkan riwayat alert.")
         return
       }
-      if (result.state) setState(result.state)
+      if (result.state) applyState(result.state)
       toast.success("Riwayat alert dibersihkan.")
     } catch {
       toast.error("Gagal membersihkan riwayat alert.")
     }
-  }, [])
+  }, [applyState])
 
   const resetDefault = useCallback(async () => {
     const res = await apiFetch("/api/monitoring/state", { method: "DELETE" })
     if (res.ok) {
-      setState((await res.json()) as MonitoringState)
+      applyState((await res.json()) as MonitoringState)
       toast.success("Database monitoring dikosongkan.")
     } else {
       toast.error("Gagal mereset database monitoring.")
     }
-  }, [])
+  }, [applyState])
 
   const derived = useMemo(() => {
     const operationalAlerts = buildOperationalAlerts(state.olts, state.onus, state.alerts)

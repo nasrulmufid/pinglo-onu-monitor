@@ -98,10 +98,46 @@ export function getInitials(name: string): string {
   return `${words[0][0]}${words[1][0]}`.toUpperCase()
 }
 
+export function normalizeMonitoringState(state: MonitoringState): MonitoringState {
+  const offlineOltIds = new Set(state.olts.filter((o) => o.status === "offline").map((o) => o.id))
+  if (offlineOltIds.size === 0) return state
+
+  let oltsChanged = false
+  const olts = state.olts.map((olt) => {
+    if (offlineOltIds.has(olt.id) && olt.activeOnu !== 0) {
+      oltsChanged = true
+      return { ...olt, activeOnu: 0 }
+    }
+    return olt
+  })
+
+  let onusChanged = false
+  const onus = state.onus.map((onu) => {
+    if (!offlineOltIds.has(onu.oltId)) return onu
+    const nextDownReason = onu.status === "online" ? "OLT offline" : onu.downReason || "OLT offline"
+    if (onu.status === "offline" && onu.downReason === nextDownReason) return onu
+    onusChanged = true
+    return {
+      ...onu,
+      status: "offline" as const,
+      downReason: nextDownReason,
+    }
+  })
+
+  if (!oltsChanged && !onusChanged) return state
+  return {
+    ...state,
+    olts: oltsChanged ? olts : state.olts,
+    onus: onusChanged ? onus : state.onus,
+  }
+}
+
 export function buildOperationalAlerts(olts: Olt[], onus: Onu[], savedAlerts: Alert[]): Alert[] {
   const generated: Alert[] = []
+  const offlineOltIds = new Set<string>()
   for (const olt of olts) {
     if (olt.status !== "online") {
+      if (olt.status === "offline") offlineOltIds.add(olt.id)
       generated.push({
         id: `olt-${olt.id}-offline`,
         oltId: olt.id,
@@ -114,6 +150,7 @@ export function buildOperationalAlerts(olts: Olt[], onus: Onu[], savedAlerts: Al
     }
   }
   for (const onu of onus) {
+    if (offlineOltIds.has(onu.oltId)) continue
     const olt = olts.find((i) => i.id === onu.oltId)
     const hasSavedDown = savedAlerts.some((a) => !a.acknowledged && a.id.startsWith(`onu-${onu.id}-down-`))
     if (onu.status !== "online") {

@@ -236,6 +236,19 @@ export function initDatabase() {
   if (!db.prepare("SELECT value FROM settings WHERE key = 'map'").get()) {
     db.prepare("INSERT INTO settings (key, value) VALUES ('map', ?)").run(JSON.stringify(defaultMapSettings))
   }
+
+  db.exec(`
+    UPDATE olts SET active_onu = 0 WHERE status = 'offline' AND active_onu != 0;
+    UPDATE onus
+    SET status = 'offline',
+        down_reason = CASE
+          WHEN status = 'online' THEN 'OLT offline'
+          WHEN down_reason IS NULL OR TRIM(down_reason) = '' THEN 'OLT offline'
+          ELSE down_reason
+        END
+    WHERE olt_id IN (SELECT id FROM olts WHERE status = 'offline')
+      AND (status != 'offline' OR down_reason IS NULL OR TRIM(down_reason) = '');
+  `)
 }
 
 initDatabase()

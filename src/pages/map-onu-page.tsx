@@ -48,6 +48,8 @@ export function MapOnuPage() {
   })
 
   const oltNameMap = useMemo(() => new Map(olts.map((o) => [o.id, o.name])), [olts])
+  const oltStatusMap = useMemo(() => new Map(olts.map((o) => [o.id, o.status])), [olts])
+  const isOnuOnline = (onu: Onu) => onu.status === "online" && oltStatusMap.get(onu.oltId) !== "offline"
 
   const ponOptions = useMemo(() => {
     const set = new Set(onus.filter((o) => oltFilter === "all" || o.oltId === oltFilter).map((o) => o.ponPort))
@@ -56,21 +58,22 @@ export function MapOnuPage() {
 
   const filteredOnus = useMemo(() => {
     return onus.filter((onu) => {
+      const online = onu.status === "online" && oltStatusMap.get(onu.oltId) !== "offline"
       if (oltFilter !== "all" && onu.oltId !== oltFilter) return false
       if (ponFilter !== "all" && onu.ponPort !== ponFilter) return false
-      if (statusFilter === "online" && onu.status !== "online") return false
-      if (statusFilter === "offline" && onu.status === "online") return false
+      if (statusFilter === "online" && !online) return false
+      if (statusFilter === "offline" && online) return false
       if (query.trim()) {
         const hay = `${onu.name} ${onu.serialNumber} ${onu.ponPort}:${onu.onuIndex}`.toLowerCase()
         if (!hay.includes(query.trim().toLowerCase())) return false
       }
       return true
     })
-  }, [onus, oltFilter, ponFilter, statusFilter, query])
+  }, [onus, oltStatusMap, oltFilter, ponFilter, statusFilter, query])
 
   const mappedOnus = filteredOnus.filter((o) => o.latitude != null && o.longitude != null)
   const unmappedOnus = filteredOnus.filter((o) => o.latitude == null || o.longitude == null)
-  const mappedOnlineCount = mappedOnus.filter((o) => o.status === "online").length
+  const mappedOnlineCount = mappedOnus.filter((o) => isOnuOnline(o)).length
   const mappedOfflineCount = mappedOnus.length - mappedOnlineCount
   const coveragePct = filteredOnus.length ? Math.round((mappedOnus.length / filteredOnus.length) * 100) : 0
 
@@ -303,7 +306,9 @@ export function MapOnuPage() {
             {draftCoord && <Marker position={[draftCoord.lat, draftCoord.lng]} icon={draftOnuIcon} />}
 
             {mappedOnus.map((onu) => {
-              const isOnline = onu.status === "online"
+              const oltOffline = oltStatusMap.get(onu.oltId) === "offline"
+              const isOnline = isOnuOnline(onu)
+              const downReason = oltOffline ? onu.downReason || "OLT offline" : onu.downReason || "Down"
               return (
                 <Marker key={onu.id} position={[onu.latitude!, onu.longitude!]} icon={isOnline ? onlineOnuIcon : offlineOnuIcon}>
                   <Popup minWidth={240}>
@@ -328,7 +333,7 @@ export function MapOnuPage() {
                           RX: <b>{onu.rxPower ? `${onu.rxPower} dBm` : "-"}</b> | Suhu:{" "}
                           {onu.temperatureC != null ? `${onu.temperatureC}°C` : "-"}
                         </p>
-                        {!isOnline && <p className="text-red-500">Alasan Down: {onu.downReason || "Down"}</p>}
+                        {!isOnline && <p className="text-red-500">Alasan Down: {downReason}</p>}
                         {onu.locationNote && <p className="italic opacity-75">Catatan: {onu.locationNote}</p>}
                         <p className="text-[11px] opacity-60">Update: {onu.lastSeen}</p>
                       </div>
@@ -408,7 +413,7 @@ export function MapOnuPage() {
                       >
                         <div className="flex items-center justify-between gap-2">
                           <span className="truncate text-xs font-semibold">{onu.name}</span>
-                          {onu.status === "online" ? (
+                          {isOnuOnline(onu) ? (
                             <Wifi className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
                           ) : (
                             <WifiOff className="h-3.5 w-3.5 shrink-0 text-red-500" />
